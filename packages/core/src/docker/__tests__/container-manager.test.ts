@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import type { ContainerConfig } from '@multiverse/types';
+import { describe, expect, it } from 'vitest';
 import { ContainerManager } from '../container-manager.js';
 import { DockerClient } from '../docker-client.js';
-import type { ContainerConfig } from '@multiverse/types';
 
 describe('ContainerManager', () => {
   it('should create container config', () => {

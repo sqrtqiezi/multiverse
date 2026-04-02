@@ -1,5 +1,5 @@
-import Docker from 'dockerode';
 import type { DockerAvailability } from '@multiverse/types';
+import Docker from 'dockerode';
 
 export class DockerClient {
   private docker: Docker;

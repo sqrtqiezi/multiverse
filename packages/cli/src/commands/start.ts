@@ -1,12 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  DockerClient,
-  ImageBuilder,
-  CredentialResolver,
-  ContainerManager,
-} from '@multiverse/core';
+import { ContainerManager, CredentialResolver, DockerClient, ImageBuilder } from '@multiverse/core';
 import type { ContainerConfig } from '@multiverse/types';
+import type { Container } from 'dockerode';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,7 +74,7 @@ export async function startCommand(): Promise<void> {
   // Step 5: Create and start container
   const containerManager = new ContainerManager(dockerClient);
 
-  let container;
+  let container: Container | undefined;
   try {
     container = await containerManager.createAndStart(config);
     console.log('✓ Container started\n');

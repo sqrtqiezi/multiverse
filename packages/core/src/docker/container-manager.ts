@@ -1,5 +1,5 @@
-import type { Container } from 'dockerode';
 import type { ContainerConfig } from '@multiverse/types';
+import type { Container } from 'dockerode';
 import type { DockerClient } from './docker-client.js';
 
 export class ContainerManager {
@@ -8,9 +8,7 @@ export class ContainerManager {
   async createAndStart(config: ContainerConfig): Promise<Container> {
     const docker = this.dockerClient.getDocker();
 
-    const binds = config.volumes.map(
-      v => `${v.hostPath}:${v.containerPath}:${v.mode}`
-    );
+    const binds = config.volumes.map((v) => `${v.hostPath}:${v.containerPath}:${v.mode}`);
 
     const container = await docker.createContainer({
       Image: config.image,

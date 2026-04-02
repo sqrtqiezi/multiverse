@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { ImageBuilder } from '../image-builder.js';
+import { describe, expect, it, vi } from 'vitest';
 import { DockerClient } from '../docker-client.js';
+import { ImageBuilder } from '../image-builder.js';
 
 describe('ImageBuilder', () => {
   it('should check if image exists', async () => {

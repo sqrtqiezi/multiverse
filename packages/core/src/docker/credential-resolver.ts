@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import * as os from 'node:os';
-import type { CredentialPath, CredentialConfig } from '@multiverse/types';
+import * as path from 'node:path';
+import type { CredentialConfig, CredentialPath } from '@multiverse/types';
 
 const CREDENTIAL_FILES = ['credentials.json', '.credentials'];
 

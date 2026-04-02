@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DockerClient } from '../docker-client.js';
 
 describe('DockerClient', () => {
@@ -27,7 +27,7 @@ describe('DockerClient', () => {
         ping() {
           throw new Error('Docker not running');
         }
-      }
+      },
     }));
 
     const client = new DockerClient();

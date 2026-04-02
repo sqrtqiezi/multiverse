@@ -34,3 +34,6 @@ pnpm lint           # Lint and format check
 - All packages use ESM (`"type": "module"`)
 - TypeScript strict mode enabled
 - Dependency order: types → core → cli/gui
+
+
+**重要** 所有 story 开发时，都需要先编写 Gherkin 语法的 e2e 测试，然后拆分为单元测试，使用 TDD 的开发流程
