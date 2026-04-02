@@ -5,3 +5,9 @@ export function greet(): string {
 }
 
 export type { AgentConfig };
+
+// Export Docker modules
+export { DockerClient } from './docker/docker-client.js';
+export { ImageBuilder } from './docker/image-builder.js';
+export { CredentialResolver } from './docker/credential-resolver.js';
+export { ContainerManager } from './docker/container-manager.js';

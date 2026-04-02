@@ -1,4 +1,3 @@
-import type Docker from 'dockerode';
 import type { Container } from 'dockerode';
 import type { ContainerConfig } from '@multiverse/types';
 import type { DockerClient } from './docker-client.js';
