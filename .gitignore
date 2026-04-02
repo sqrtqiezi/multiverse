@@ -4,6 +4,9 @@ dist/
 *.tsbuildinfo
 target/
 
+# Tauri
+packages/gui/src-tauri/gen/
+
 # IDE
 .vscode/
 .idea/
@@ -22,3 +25,6 @@ Thumbs.db
 
 # Reports
 reports/
+
+# Plans (local only)
+.claude/plans/
