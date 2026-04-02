@@ -1,7 +1,8 @@
 import assert from 'node:assert';
+import { createHash } from 'node:crypto';
+import { exec } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Given, Then, When } from '@cucumber/cucumber';
 
@@ -33,16 +34,83 @@ function sanitizeBranchName(branch: string) {
   return branch.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
-async function readCurrentVerse() {
+function getVersePathCandidates(repoRoot: string, branch: string) {
+  const sanitizedBranch = sanitizeBranchName(branch);
+  const branchHash = createHash('sha1').update(branch).digest('hex').slice(0, 8);
+
+  return [
+    path.join(repoRoot, verseDir, `${sanitizedBranch}.json`),
+    path.join(repoRoot, verseDir, `${sanitizedBranch.toLowerCase()}-${branchHash}.json`),
+  ];
+}
+
+async function pathExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveCurrentVersePath() {
   const [repoRoot, branch] = await Promise.all([getRepoRoot(), getCurrentBranch()]);
-  const versePath = path.join(repoRoot, verseDir, `${sanitizeBranchName(branch)}.json`);
+  const candidates = getVersePathCandidates(repoRoot, branch);
+
+  for (const versePath of candidates) {
+    if (await pathExists(versePath)) {
+      return { branch, candidates, repoRoot, versePath };
+    }
+  }
+
+  return {
+    branch,
+    candidates,
+    repoRoot,
+    versePath: candidates[0],
+  };
+}
+
+async function readCurrentVerse() {
+  const { branch, candidates, repoRoot, versePath } = await resolveCurrentVersePath();
   const raw = await fs.readFile(versePath, 'utf8');
 
   return {
     branch,
+    candidates,
+    repoRoot,
     versePath,
     verse: JSON.parse(raw),
   };
+}
+
+async function assertVerseFileAbsent() {
+  const { candidates } = await resolveCurrentVersePath();
+  const existingPaths = [];
+
+  for (const candidatePath of candidates) {
+    if (await pathExists(candidatePath)) {
+      existingPaths.push(candidatePath);
+    }
+  }
+
+  assert.strictEqual(
+    existingPaths.length,
+    0,
+    `Expected verse file to be absent, but found: ${existingPaths.join(', ')}`,
+  );
+}
+
+async function findExistingVersePath() {
+  const { candidates } = await resolveCurrentVersePath();
+
+  for (const candidatePath of candidates) {
+    if (await pathExists(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  return undefined;
 }
 
 Given('Docker is not running', async function () {
@@ -73,6 +141,11 @@ Given('Claude credentials exist', async function () {
   if (!runDockerScenarios) {
     return 'skipped';
   }
+});
+
+Given('verse file for current branch should not exist', async () => {
+  await assertVerseFileAbsent();
+  lastObservedRunCount = undefined;
 });
 
 When('I run {string}', async (command: string) => {
@@ -115,11 +188,14 @@ Then('I should see {string}', (expectedText: string) => {
   assert(commandOutput.includes(expectedText));
 });
 
-Then('verse file for current branch should exist', async () => {
-  const { versePath } = await readCurrentVerse();
-  const stats = await fs.stat(versePath);
 
-  assert(stats.isFile(), `Expected verse file to exist at ${versePath}`);
+Then('verse file for current branch should exist', async () => {
+  const existingPath = await findExistingVersePath();
+
+  assert(existingPath, 'Expected a verse file to exist');
+
+  const stats = await fs.stat(existingPath);
+  assert(stats.isFile(), `Expected verse file to exist at ${existingPath}`);
 });
 
 Then('verse file for current branch has at least 1 run', async () => {
