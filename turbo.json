@@ -22,6 +22,16 @@
     },
     "clean": {
       "cache": false
+    },
+    "tauri:build": {
+      "dependsOn": ["^build"],
+      "outputs": ["src-tauri/target/release/bundle/**"],
+      "cache": false
+    },
+    "tauri:dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
     }
   }
 }

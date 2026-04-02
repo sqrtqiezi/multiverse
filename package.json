@@ -14,7 +14,9 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "tauri:dev": "pnpm --filter @multiverse/gui tauri:dev",
+    "tauri:build": "pnpm --filter @multiverse/gui tauri:build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
