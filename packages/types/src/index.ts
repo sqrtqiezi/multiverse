@@ -6,3 +6,5 @@ export interface AgentConfig {
   image: string;
   env?: Record<string, string>;
 }
+
+export * from './docker.js';

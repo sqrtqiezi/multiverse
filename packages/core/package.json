@@ -9,14 +9,20 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
-    "@multiverse/types": "workspace:*"
+    "@multiverse/types": "workspace:*",
+    "dockerode": "^4.0.10"
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^4.0.1"
   }
 }
