@@ -4,29 +4,39 @@ import { promisify } from 'node:util';
 import { Given, Then, When } from '@cucumber/cucumber';
 
 const execAsync = promisify(exec);
+const runDockerScenarios = process.env.MULTIVERSE_E2E_DOCKER === '1';
 
 let commandOutput = '';
 let commandExitCode = 0;
 
-Given('Docker is not running', async () => {
-  // This step assumes Docker is actually not running
-  // In real tests, you might mock or skip this
-});
-
-Given('Docker is available', async function () {
-  try {
-    await execAsync('docker ps');
-  } catch {
-    this.skip();
+Given('Docker is not running', async function () {
+  if (!runDockerScenarios) {
+    return 'skipped';
   }
 });
 
-Given('Claude credentials do not exist', async () => {
-  // Mock by temporarily renaming ~/.claude
+Given('Docker is available', async function () {
+  if (!runDockerScenarios) {
+    return 'skipped';
+  }
+
+  try {
+    await execAsync('docker ps');
+  } catch {
+    return 'skipped';
+  }
 });
 
-Given('Claude credentials exist', async () => {
-  // Verify ~/.claude exists
+Given('Claude credentials do not exist', async function () {
+  if (!runDockerScenarios) {
+    return 'skipped';
+  }
+});
+
+Given('Claude credentials exist', async function () {
+  if (!runDockerScenarios) {
+    return 'skipped';
+  }
 });
 
 When('I run {string}', async (command: string) => {

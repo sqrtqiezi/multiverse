@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ContainerManager, CredentialResolver, DockerClient, ImageBuilder } from '@multiverse/core';
@@ -5,6 +6,24 @@ import type { ContainerConfig } from '@multiverse/types';
 import type { Container } from 'dockerode';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function findWorkspaceRoot(startDir: string): string {
+  let currentDir = startDir;
+
+  for (;;) {
+    const workspaceFile = path.join(currentDir, 'pnpm-workspace.yaml');
+    if (fs.existsSync(workspaceFile)) {
+      return currentDir;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      throw new Error('Failed to locate workspace root (pnpm-workspace.yaml not found).');
+    }
+
+    currentDir = parentDir;
+  }
+}
 
 export async function startCommand(): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
@@ -27,7 +46,8 @@ export async function startCommand(): Promise<void> {
 
   // Step 2: Ensure image exists
   const imageTag = 'multiverse/claude-code:latest';
-  const dockerfilePath = path.resolve(__dirname, '../../../core/docker/Dockerfile');
+  const workspaceRoot = findWorkspaceRoot(__dirname);
+  const dockerfilePath = path.join(workspaceRoot, 'packages/core/docker/Dockerfile');
 
   const imageBuilder = new ImageBuilder(dockerClient);
   await imageBuilder.ensureImage(imageTag, dockerfilePath);
