@@ -5,6 +5,13 @@
   "bin": {
     "multiverse": "./dist/cli.js"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js",
+      "default": "./dist/cli.js"
+    }
+  },
   "files": ["dist"],
   "dependencies": {
     "@multiverse/core": "workspace:*",

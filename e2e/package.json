@@ -1,0 +1,16 @@
+{
+  "name": "@multiverse/e2e",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@cucumber/cucumber": "^11",
+    "@multiverse/cli": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4"
+  },
+  "scripts": {
+    "test:e2e": "cucumber-js"
+  }
+}
