@@ -15,5 +15,12 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
+    "tsup": "^8.5.1",
+    "turbo": "^2.9.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
   }
 }
