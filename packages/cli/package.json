@@ -1,0 +1,19 @@
+{
+  "name": "@multiverse/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "multiverse": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "dependencies": {
+    "@multiverse/core": "workspace:*",
+    "@multiverse/types": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  }
+}
