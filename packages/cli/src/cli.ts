@@ -1,13 +1,17 @@
-import { greet } from '@multiverse/core';
+#!/usr/bin/env node
+import { Command } from 'commander';
+import { startCommand } from './commands/start.js';
 
-export function run(args: string[]): string {
-  if (args.includes('--version')) {
-    return 'multiverse 0.0.1';
-  }
-  return greet();
-}
+const program = new Command();
 
-const args = process.argv.slice(2);
-if (args.length > 0) {
-  console.log(run(args));
-}
+program
+  .name('multiverse')
+  .version('0.0.1')
+  .description('Coding agent harness management tool');
+
+program
+  .command('start')
+  .description('Start a containerized coding agent')
+  .action(startCommand);
+
+program.parse();
