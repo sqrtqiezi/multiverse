@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { createServer, request as httpRequest, type Server } from 'node:http';
 import * as fs from 'node:fs';
+import { request as httpsRequest } from 'node:https';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppError } from '@multiverse/core';
@@ -9,6 +11,7 @@ import {
   DockerClient,
   ErrorCode,
   ImageBuilder,
+  ORIGINAL_ANTHROPIC_BASE_URL_ENV,
   PreflightChecker,
   VerseService,
 } from '@multiverse/core';
@@ -16,6 +19,11 @@ import type { ContainerConfig } from '@multiverse/types';
 import type { Container } from 'dockerode';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+interface AnthropicBaseUrlProxy {
+  baseUrl: string;
+  server: Server;
+}
 
 function findWorkspaceRoot(startDir: string): string {
   let currentDir = startDir;
@@ -35,8 +43,86 @@ function findWorkspaceRoot(startDir: string): string {
   }
 }
 
+function usesHostDockerInternal(baseUrl?: string) {
+  if (!baseUrl) {
+    return false;
+  }
+
+  try {
+    return new URL(baseUrl).hostname === 'host.docker.internal';
+  } catch {
+    return false;
+  }
+}
+
+async function closeAnthropicBaseUrlProxy(proxy?: AnthropicBaseUrlProxy) {
+  if (!proxy) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    proxy.server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function startAnthropicBaseUrlProxy(
+  containerBaseUrl: string,
+  originalBaseUrl: string,
+): Promise<AnthropicBaseUrlProxy> {
+  const upstreamBaseUrl = new URL(originalBaseUrl);
+  const requestImpl = upstreamBaseUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+  const server = createServer((req, res) => {
+    const upstream = requestImpl(
+      {
+        hostname: upstreamBaseUrl.hostname,
+        port: Number(upstreamBaseUrl.port || (upstreamBaseUrl.protocol === 'https:' ? 443 : 80)),
+        path: req.url || '/',
+        method: req.method,
+        headers: req.headers,
+      },
+      (upstreamResponse) => {
+        res.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
+        upstreamResponse.pipe(res);
+      },
+    );
+
+    upstream.on('error', (error) => {
+      res.statusCode = 502;
+      res.end(`anthropic base url proxy upstream error: ${String(error)}`);
+    });
+
+    req.pipe(upstream);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '0.0.0.0', resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to determine anthropic base url proxy port');
+  }
+
+  const proxiedBaseUrl = new URL(containerBaseUrl);
+  proxiedBaseUrl.hostname = 'host.docker.internal';
+  proxiedBaseUrl.port = String(address.port);
+
+  return {
+    baseUrl: proxiedBaseUrl.toString(),
+    server,
+  };
+}
+
 export async function startCommand(): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
+  const scriptedPrompt = process.env.MULTIVERSE_CLAUDE_PRINT_PROMPT?.trim();
 
   // Step 1: Run preflight checks (Docker, credentials, workspace, disk space)
   const preflightChecker = new PreflightChecker();
@@ -62,6 +148,8 @@ export async function startCommand(): Promise<void> {
   // Step 4: Resolve credentials
   const credentialResolver = new CredentialResolver();
   const credentials = await credentialResolver.resolveCredentials();
+  const originalAnthropicBaseUrl = credentials.envVars[ORIGINAL_ANTHROPIC_BASE_URL_ENV];
+  delete credentials.envVars[ORIGINAL_ANTHROPIC_BASE_URL_ENV];
 
   if (credentials.filePaths.length === 0 && Object.keys(credentials.envVars).length === 0) {
     throw {
@@ -78,6 +166,17 @@ export async function startCommand(): Promise<void> {
   }
   console.log();
 
+  let anthropicBaseUrlProxy: AnthropicBaseUrlProxy | undefined;
+  if (credentials.envVars.ANTHROPIC_BASE_URL && originalAnthropicBaseUrl) {
+    anthropicBaseUrlProxy = await startAnthropicBaseUrlProxy(
+      credentials.envVars.ANTHROPIC_BASE_URL,
+      originalAnthropicBaseUrl,
+    );
+    credentials.envVars.ANTHROPIC_BASE_URL = anthropicBaseUrlProxy.baseUrl;
+    console.log('✓ Bridged local Anthropic base URL for container access');
+    console.log();
+  }
+
   const verseService = new VerseService();
   const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
@@ -93,7 +192,12 @@ export async function startCommand(): Promise<void> {
     image: imageTag,
     volumes: [workspaceMount, ...credentials.filePaths],
     workDir: '/workspace',
+    entrypoint: scriptedPrompt ? ['claude', '--bare', '-p', scriptedPrompt] : undefined,
     env: credentials.envVars,
+    extraHosts:
+      process.platform === 'linux' && usesHostDockerInternal(credentials.envVars.ANTHROPIC_BASE_URL)
+        ? ['host.docker.internal:host-gateway']
+        : undefined,
     autoRemove: true,
   };
 
@@ -114,7 +218,11 @@ export async function startCommand(): Promise<void> {
     });
     runStarted = true;
     console.log('✓ Container started\n');
-    console.log('Entering claude-code interactive mode...\n');
+    if (scriptedPrompt) {
+      console.log('Running claude-code scripted prompt mode...\n');
+    } else {
+      console.log('Entering claude-code interactive mode...\n');
+    }
     console.log('─'.repeat(50));
     console.log();
 
@@ -135,6 +243,7 @@ export async function startCommand(): Promise<void> {
     console.log();
     console.log('─'.repeat(50));
     console.log(`\n✓ Container exited with code ${exitCode}`);
+    await closeAnthropicBaseUrlProxy(anthropicBaseUrlProxy);
 
     process.exit(exitCode);
   } catch (error) {
@@ -155,6 +264,7 @@ export async function startCommand(): Promise<void> {
     if (container) {
       await containerManager.remove(container);
     }
+    await closeAnthropicBaseUrlProxy(anthropicBaseUrlProxy);
 
     // Re-throw as AppError if not already one
     const validErrorCodes = Object.values(ErrorCode);

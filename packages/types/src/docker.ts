@@ -4,6 +4,7 @@ export interface ContainerConfig {
   workDir: string;
   entrypoint?: string[];
   env?: Record<string, string>;
+  extraHosts?: string[];
   autoRemove?: boolean;
 }
 

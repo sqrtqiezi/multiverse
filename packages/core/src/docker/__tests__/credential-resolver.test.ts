@@ -120,4 +120,20 @@ describe('CredentialResolver', () => {
     expect(result.filePaths).toHaveLength(1);
     expect(result.envVars.ANTHROPIC_API_KEY).toBe('sk-ant-test-key');
   });
+
+  it('should rewrite localhost anthropic base url for container access', async () => {
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:11434';
+
+    const result = await resolver.resolveEnvVars();
+
+    expect(result.ANTHROPIC_BASE_URL).toBe('http://host.docker.internal:11434');
+  });
+
+  it('should rewrite localhost hostname anthropic base url for container access', async () => {
+    process.env.ANTHROPIC_BASE_URL = 'http://localhost:11434/v1';
+
+    const result = await resolver.resolveEnvVars();
+
+    expect(result.ANTHROPIC_BASE_URL).toBe('http://host.docker.internal:11434/v1');
+  });
 });

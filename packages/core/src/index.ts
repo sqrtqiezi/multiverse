@@ -6,6 +6,7 @@ export function greet(): string {
 
 export { ContainerManager } from './docker/container-manager.js';
 export { CredentialResolver } from './docker/credential-resolver.js';
+export { ORIGINAL_ANTHROPIC_BASE_URL_ENV } from './docker/credential-resolver.js';
 // Export Docker modules
 export { DockerClient } from './docker/docker-client.js';
 export { ImageBuilder } from './docker/image-builder.js';

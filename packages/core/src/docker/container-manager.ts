@@ -22,6 +22,7 @@ export class ContainerManager {
       AttachStderr: true,
       HostConfig: {
         Binds: binds,
+        ExtraHosts: config.extraHosts,
         AutoRemove: config.autoRemove ?? true,
       },
     });

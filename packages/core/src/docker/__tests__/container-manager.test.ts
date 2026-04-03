@@ -1,11 +1,12 @@
 import type { ContainerConfig } from '@multiverse/types';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ContainerManager } from '../container-manager.js';
-import { DockerClient } from '../docker-client.js';
 
 describe('ContainerManager', () => {
   it('should create container config', () => {
-    const dockerClient = new DockerClient();
+    const dockerClient = {
+      getDocker: () => ({ createContainer: vi.fn() }),
+    } as any;
     const manager = new ContainerManager(dockerClient);
 
     const config: ContainerConfig = {
@@ -18,6 +19,28 @@ describe('ContainerManager', () => {
     expect(config.image).toBe('multiverse/claude-code:latest');
   });
 
-  // Note: Full integration tests require Docker running
-  // These are unit tests with mocked Docker API
+  it('should pass extra hosts to docker host config', async () => {
+    const start = vi.fn();
+    const createContainer = vi.fn().mockResolvedValue({ start });
+    const dockerClient = {
+      getDocker: () => ({ createContainer }),
+    } as any;
+    const manager = new ContainerManager(dockerClient);
+
+    await manager.createAndStart({
+      image: 'multiverse/claude-code:latest',
+      volumes: [],
+      workDir: '/workspace',
+      extraHosts: ['host.docker.internal:host-gateway'],
+    });
+
+    expect(createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        HostConfig: expect.objectContaining({
+          ExtraHosts: ['host.docker.internal:host-gateway'],
+        }),
+      }),
+    );
+    expect(start).toHaveBeenCalled();
+  });
 });

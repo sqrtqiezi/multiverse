@@ -4,6 +4,34 @@ import * as path from 'node:path';
 import type { CredentialConfig, CredentialPath } from '@multiverse/types';
 
 const CREDENTIAL_FILES = ['credentials.json', '.credentials'];
+export const ORIGINAL_ANTHROPIC_BASE_URL_ENV = 'MULTIVERSE_ORIGINAL_ANTHROPIC_BASE_URL';
+
+function isLoopbackHost(hostname: string) {
+  return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1';
+}
+
+function preserveBareOrigin(originalValue: string, renderedValue: string) {
+  return /^[a-zA-Z][a-zA-Z\d+.-]*:\/\/[^/]+$/.test(originalValue)
+    ? renderedValue.replace(/\/$/, '')
+    : renderedValue;
+}
+
+function rewriteAnthropicBaseUrlForContainer(baseUrl: string) {
+  try {
+    const parsed = new URL(baseUrl);
+    if (!isLoopbackHost(parsed.hostname)) {
+      return { rewritten: baseUrl };
+    }
+
+    parsed.hostname = 'host.docker.internal';
+    return {
+      original: baseUrl,
+      rewritten: preserveBareOrigin(baseUrl, parsed.toString()),
+    };
+  } catch {
+    return { rewritten: baseUrl };
+  }
+}
 
 export class CredentialResolver {
   private claudeDir: string;
@@ -50,6 +78,15 @@ export class CredentialResolver {
 
     for (const [key, value] of Object.entries(process.env)) {
       if ((key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) && value !== undefined) {
+        if (key === 'ANTHROPIC_BASE_URL') {
+          const { original, rewritten } = rewriteAnthropicBaseUrlForContainer(value);
+          envVars[key] = rewritten;
+          if (original) {
+            envVars[ORIGINAL_ANTHROPIC_BASE_URL_ENV] = original;
+          }
+          continue;
+        }
+
         envVars[key] = value;
       }
     }

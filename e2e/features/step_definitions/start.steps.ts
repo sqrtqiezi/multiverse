@@ -4,22 +4,69 @@ import { exec } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { Given, Then, When, setDefaultTimeout } from '@cucumber/cucumber';
+import { After, Before, Given, Then, When, setDefaultTimeout } from '@cucumber/cucumber';
 
 const execAsync = promisify(exec);
-const startCommandTimeoutMs = Number(process.env.MULTIVERSE_E2E_START_TIMEOUT_MS ?? '120000');
+const startCommandTimeoutMs = Number(process.env.MULTIVERSE_E2E_START_TIMEOUT_MS ?? '60000');
 const verseDir = '.multiverse/verses';
-setDefaultTimeout(startCommandTimeoutMs + 5000);
+setDefaultTimeout(startCommandTimeoutMs);
 
 type ScenarioDockerMode = 'normal' | 'unavailable';
 type ScenarioCredentialMode = 'exists' | 'missing';
+type ScenarioBackendMode = 'default' | 'ollama';
 
 let commandOutput = '';
 let commandExitCode = 0;
 let lastObservedRunCount: number | undefined;
 let dockerMode: ScenarioDockerMode = 'normal';
 let credentialMode: ScenarioCredentialMode = 'exists';
+let backendMode: ScenarioBackendMode = 'default';
 let cliBuilt = false;
+let ollamaRuntimeReady = false;
+
+const ollamaExpectedToken = process.env.MULTIVERSE_E2E_OLLAMA_EXPECTED_TOKEN ?? 'E2E_OLLAMA_OK_20260403';
+const ollamaPrompt = `Reply with exactly ${ollamaExpectedToken} and nothing else.`;
+
+function getOllamaModel() {
+  return process.env.MULTIVERSE_E2E_OLLAMA_MODEL ?? 'qwen3-coder:480b-cloud';
+}
+
+function getOllamaHostBaseUrl() {
+  return process.env.MULTIVERSE_E2E_OLLAMA_HOST_BASE_URL ?? 'http://127.0.0.1:11434';
+}
+
+function stripTrailingSlash(value: string) {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+async function invokeAnthropicCompatibleApi(baseUrl: string, prompt: string) {
+  const response = await fetch(`${stripTrailingSlash(baseUrl)}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': process.env.MULTIVERSE_E2E_OLLAMA_API_KEY ?? 'sk-ant-e2e-local',
+    },
+    body: JSON.stringify({
+      model: getOllamaModel(),
+      max_tokens: 32,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Anthropic-compatible API request failed: status=${response.status}, body=${text}`,
+    );
+  }
+
+  return text;
+}
 
 async function getRepoRoot() {
   const { stdout } = await execAsync('git rev-parse --show-toplevel');
@@ -129,6 +176,13 @@ async function findExistingVersePath() {
   return undefined;
 }
 
+Before(() => {
+  dockerMode = 'normal';
+  credentialMode = 'exists';
+  backendMode = 'default';
+  ollamaRuntimeReady = false;
+});
+
 Given('Docker is not running', async function () {
   dockerMode = 'unavailable';
 });
@@ -149,6 +203,12 @@ Given('Claude credentials do not exist', async function () {
 
 Given('Claude credentials exist', async function () {
   credentialMode = 'exists';
+});
+
+Given('Ollama Anthropic-compatible API is available', async function () {
+  backendMode = 'ollama';
+  await invokeAnthropicCompatibleApi(getOllamaHostBaseUrl(), ollamaPrompt);
+  ollamaRuntimeReady = true;
 });
 
 Given('verse file for current branch should not exist', async () => {
@@ -192,7 +252,21 @@ When('I run {string}', async (command: string) => {
     // Create .claude directory for preflight checks
     const claudeDir = path.join(env.HOME, '.claude');
     await fs.mkdir(claudeDir, { recursive: true });
-    env.ANTHROPIC_API_KEY = 'sk-ant-e2e-dummy-key';
+    if (backendMode === 'ollama') {
+      if (!ollamaRuntimeReady) {
+        await invokeAnthropicCompatibleApi(getOllamaHostBaseUrl(), ollamaPrompt);
+        ollamaRuntimeReady = true;
+      }
+      env.ANTHROPIC_API_KEY = process.env.MULTIVERSE_E2E_OLLAMA_API_KEY ?? 'sk-ant-e2e-local';
+      env.ANTHROPIC_BASE_URL = getOllamaHostBaseUrl();
+      env.ANTHROPIC_MODEL = getOllamaModel();
+      env.MULTIVERSE_CLAUDE_PRINT_PROMPT = ollamaPrompt;
+    } else {
+      env.ANTHROPIC_API_KEY = 'sk-ant-e2e-dummy-key';
+      delete env.ANTHROPIC_BASE_URL;
+      delete env.ANTHROPIC_MODEL;
+      delete env.MULTIVERSE_CLAUDE_PRINT_PROMPT;
+    }
   }
 
   try {
@@ -208,6 +282,12 @@ When('I run {string}', async (command: string) => {
     commandOutput = (execError.stdout ?? '') + (execError.stderr ?? '');
     commandExitCode = execError.code ?? 1;
   }
+});
+
+After(async () => {
+  await execAsync(
+    'docker ps -q --filter "ancestor=multiverse/claude-code:latest" | xargs -r docker rm -f',
+  );
 });
 
 Then('the output should contain {string}', (expectedText: string) => {

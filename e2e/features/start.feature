@@ -17,9 +17,11 @@ Feature: Zero-config container start
     Then the output should contain "Claude 凭证未找到"
     And the exit code should be 1
 
-  Scenario: Start container successfully
+  Scenario: Start container and complete a real Ollama-backed Claude request
     Given Docker is available
     And Claude credentials exist
+    And Ollama Anthropic-compatible API is available
     When I run "multiverse start"
     Then the output should contain "Container started"
-    And the output should contain "Entering claude-code interactive mode"
+    And the output should contain "E2E_OLLAMA_OK_20260403"
+    And the exit code should be 0
