@@ -44,8 +44,15 @@ const isDirectExecution = process.argv[1]?.endsWith('/dist/cli.js');
 
 if (isDirectExecution) {
   const program = createProgram();
-  void program.parseAsync(process.argv).catch((error) => {
-    console.error(error);
-    process.exit(1);
+  void program.parseAsync(process.argv).catch(async (error) => {
+    const { ErrorHandler } = await import('@multiverse/core');
+    const { formatErrorOutput, toAppError } = await import('./utils/error-formatter.js');
+
+    const handler = new ErrorHandler();
+    const appError = toAppError(error);
+    const formatted = handler.format(appError);
+
+    console.error(formatErrorOutput(formatted));
+    process.exit(formatted.exitCode);
   });
 }

@@ -2,11 +2,14 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { AppError } from '@multiverse/core';
 import {
   ContainerManager,
   CredentialResolver,
   DockerClient,
+  ErrorCode,
   ImageBuilder,
+  PreflightChecker,
   VerseService,
 } from '@multiverse/core';
 import type { ContainerConfig } from '@multiverse/types';
@@ -35,23 +38,19 @@ function findWorkspaceRoot(startDir: string): string {
 export async function startCommand(): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
 
-  // Step 1: Check Docker availability
+  // Step 1: Run preflight checks (Docker, credentials, workspace, disk space)
+  const preflightChecker = new PreflightChecker();
+  await preflightChecker.runAll();
+  console.log('✓ Preflight checks passed\n');
+
+  // Step 2: Check Docker version for display
   const dockerClient = new DockerClient();
   const availability = await dockerClient.checkAvailability();
-
-  if (!availability.available) {
-    console.error('❌ Docker is not available.\n');
-    console.error('Please install Docker:');
-    console.error('  - Linux: https://docs.docker.com/engine/install/');
-    console.error('  - macOS: https://docs.docker.com/desktop/install/mac-install/');
-    console.error('  - Windows: https://docs.docker.com/desktop/install/windows-install/\n');
-    console.error('After installation, run: multiverse start');
-    process.exit(1);
+  if (availability.available) {
+    console.log(`✓ Docker ${availability.version} detected\n`);
   }
 
-  console.log(`✓ Docker ${availability.version} detected\n`);
-
-  // Step 2: Ensure image exists
+  // Step 3: Ensure image exists
   const imageTag = 'multiverse/claude-code:latest';
   const workspaceRoot = findWorkspaceRoot(__dirname);
   const dockerfilePath = path.join(workspaceRoot, 'packages/core/docker/Dockerfile');
@@ -60,19 +59,15 @@ export async function startCommand(): Promise<void> {
   await imageBuilder.ensureImage(imageTag, dockerfilePath);
   console.log(`✓ Image ${imageTag} ready\n`);
 
-  // Step 3: Resolve credentials
+  // Step 4: Resolve credentials
   const credentialResolver = new CredentialResolver();
   const credentials = await credentialResolver.resolveCredentials();
 
   if (credentials.filePaths.length === 0 && Object.keys(credentials.envVars).length === 0) {
-    console.error('❌ Claude credentials not found.\n');
-    console.error('Please authenticate using one of these methods:\n');
-    console.error('1. File-based credentials:');
-    console.error('   claude login\n');
-    console.error('2. Environment variable:');
-    console.error('   export ANTHROPIC_API_KEY=sk-ant-...\n');
-    console.error('Then run: multiverse start');
-    process.exit(1);
+    throw {
+      code: ErrorCode.CREDENTIALS_NOT_FOUND,
+      message: 'Claude credentials not found',
+    } as AppError;
   }
 
   if (credentials.filePaths.length > 0) {
@@ -87,7 +82,7 @@ export async function startCommand(): Promise<void> {
   const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
-  // Step 4: Create container config
+  // Step 5: Create container config
   const workspaceMount = {
     hostPath: process.cwd(),
     containerPath: '/workspace',
@@ -102,7 +97,7 @@ export async function startCommand(): Promise<void> {
     autoRemove: true,
   };
 
-  // Step 5: Create and start container
+  // Step 6: Create and start container
   const containerManager = new ContainerManager(dockerClient);
 
   let container: Container | undefined;
@@ -123,10 +118,10 @@ export async function startCommand(): Promise<void> {
     console.log('─'.repeat(50));
     console.log();
 
-    // Step 6: Attach to container
+    // Step 7: Attach to container
     await containerManager.attach(container);
 
-    // Step 7: Wait for exit
+    // Step 8: Wait for exit
     const exitCode = await containerManager.waitForExit(container);
     await verseService.finalizeRun({
       cwd: process.cwd(),
@@ -143,8 +138,6 @@ export async function startCommand(): Promise<void> {
 
     process.exit(exitCode);
   } catch (error) {
-    console.error('\n❌ Failed to start container:', error);
-
     if (runStarted && !runFinalized && container) {
       try {
         await verseService.finalizeRun({
@@ -155,7 +148,7 @@ export async function startCommand(): Promise<void> {
           containerId: container.id,
         });
       } catch (finalizeError) {
-        console.error('❌ Failed to finalize verse run:', finalizeError);
+        console.error('Failed to finalize verse run:', finalizeError);
       }
     }
 
@@ -163,6 +156,19 @@ export async function startCommand(): Promise<void> {
       await containerManager.remove(container);
     }
 
-    process.exit(1);
+    // Re-throw as AppError if not already one
+    const validErrorCodes = Object.values(ErrorCode);
+    if (
+      (error as AppError).code &&
+      validErrorCodes.includes((error as AppError).code)
+    ) {
+      throw error;
+    }
+
+    throw {
+      code: ErrorCode.CONTAINER_START_FAILED,
+      message: 'Failed to start container',
+      cause: error instanceof Error ? error : new Error(String(error)),
+    } as AppError;
   }
 }
