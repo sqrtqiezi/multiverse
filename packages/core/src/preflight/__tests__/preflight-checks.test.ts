@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PreflightChecker } from '../preflight-checks';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode } from '../../error-handler/error-codes';
 import type { AppError } from '../../error-handler/types';
+import { PreflightChecker } from '../preflight-checks';
 
 describe('PreflightChecker', () => {
   let checker: PreflightChecker;
@@ -12,7 +12,7 @@ describe('PreflightChecker', () => {
 
   describe('checkDockerAvailable', () => {
     it('应该在 Docker 可用时通过检测', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         callback(null, { stdout: 'Docker version 24.0.0', stderr: '' });
       });
 
@@ -21,7 +21,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在 Docker 不可用时抛出错误', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         callback(new Error('command not found'), { stdout: '', stderr: '' });
       });
 
@@ -34,7 +34,7 @@ describe('PreflightChecker', () => {
 
   describe('checkCredentials', () => {
     it('应该在凭证存在时通过检测', async () => {
-      const mockAccess = vi.fn((path, callback) => {
+      const mockAccess = vi.fn((_path, callback) => {
         callback(null);
       });
 
@@ -43,7 +43,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在凭证不存在时抛出错误', async () => {
-      const mockAccess = vi.fn((path, callback) => {
+      const mockAccess = vi.fn((_path, callback) => {
         callback(new Error('ENOENT'));
       });
 
@@ -56,7 +56,7 @@ describe('PreflightChecker', () => {
 
   describe('checkWorkspaceWritable', () => {
     it('应该在工作区可写时通过检测', async () => {
-      const mockAccess = vi.fn((path, mode, callback) => {
+      const mockAccess = vi.fn((_path, _mode, callback) => {
         callback(null);
       });
 
@@ -65,7 +65,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在目录不存在时创建目录', async () => {
-      const mockAccess = vi.fn((path, mode, callback) => {
+      const mockAccess = vi.fn((_path, mode, callback) => {
         // 第一次调用（F_OK）失败，第二次调用（W_OK）成功
         if (mode === undefined || mode === 0) {
           callback(new Error('ENOENT'));
@@ -74,7 +74,7 @@ describe('PreflightChecker', () => {
         }
       });
 
-      const mockMkdir = vi.fn((path, options, callback) => {
+      const mockMkdir = vi.fn((_path, _options, callback) => {
         callback(null);
       });
 
@@ -84,7 +84,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在工作区不可写时抛出错误', async () => {
-      const mockAccess = vi.fn((path, mode, callback) => {
+      const mockAccess = vi.fn((_path, mode, callback) => {
         // 目录存在但不可写
         if (mode === undefined || mode === 0) {
           callback(null);
@@ -102,7 +102,7 @@ describe('PreflightChecker', () => {
 
   describe('checkDiskSpace', () => {
     it('应该在磁盘空间充足时通过检测', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         // 模拟 df 输出：200MB 可用（204800 KB）
         callback(null, { stdout: '204800', stderr: '' });
       });
@@ -112,7 +112,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在磁盘空间不足时抛出错误', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         // 模拟 df 输出：50MB 可用（51200 KB）
         callback(null, { stdout: '51200', stderr: '' });
       });
@@ -124,7 +124,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在命令执行失败时抛出 UNKNOWN_ERROR', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         callback(new Error('command not found'), { stdout: '', stderr: '' });
       });
 
@@ -135,7 +135,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在输出无法解析时抛出 UNKNOWN_ERROR', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         callback(null, { stdout: 'invalid output', stderr: '' });
       });
 
@@ -156,7 +156,7 @@ describe('PreflightChecker', () => {
         }
       });
 
-      const mockAccess = vi.fn((path, modeOrCallback, callback?) => {
+      const mockAccess = vi.fn((_path, modeOrCallback, callback?) => {
         const cb = callback || modeOrCallback;
         cb(null);
       });
@@ -166,7 +166,7 @@ describe('PreflightChecker', () => {
     });
 
     it('应该在任一检测失败时停止并抛出错误', async () => {
-      const mockExec = vi.fn((cmd, callback) => {
+      const mockExec = vi.fn((_cmd, callback) => {
         callback(new Error('command not found'), { stdout: '', stderr: '' });
       });
 
@@ -177,4 +177,3 @@ describe('PreflightChecker', () => {
     });
   });
 });
-

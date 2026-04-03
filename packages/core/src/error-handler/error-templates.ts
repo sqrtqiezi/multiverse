@@ -127,5 +127,3 @@ export const ERROR_TEMPLATES: Record<ErrorCode, ErrorTemplate> = {
     exitCode: 1,
   },
 };
-
-

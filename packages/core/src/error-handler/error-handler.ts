@@ -4,24 +4,18 @@ import type { AppError, FormattedError } from './types.js';
 
 export class ErrorHandler {
   format(error: AppError): FormattedError {
-    const template =
-      ERROR_TEMPLATES[error.code] || ERROR_TEMPLATES[ErrorCode.UNKNOWN_ERROR];
+    const template = ERROR_TEMPLATES[error.code] || ERROR_TEMPLATES[ErrorCode.UNKNOWN_ERROR];
 
     return {
       title: template.title,
       description: this.replaceVariables(template.description, error.context),
       reason: template.reason,
-      suggestions: template.suggestions.map((s: string) =>
-        this.replaceVariables(s, error.context)
-      ),
+      suggestions: template.suggestions.map((s: string) => this.replaceVariables(s, error.context)),
       exitCode: template.exitCode,
     };
   }
 
-  private replaceVariables(
-    text: string,
-    context?: Record<string, unknown>
-  ): string {
+  private replaceVariables(text: string, context?: Record<string, unknown>): string {
     if (!context) {
       return text;
     }

@@ -1,5 +1,5 @@
 import { exec as nodeExec } from 'node:child_process';
-import { access as nodeAccess, constants, mkdir as nodeMkdir } from 'node:fs';
+import { constants, access as nodeAccess, mkdir as nodeMkdir } from 'node:fs';
 import { homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -90,9 +90,7 @@ export class PreflightChecker {
     }
 
     try {
-      const { stdout } = await execAsync(
-        `df -k "${process.cwd()}" | tail -1 | awk '{print $4}'`
-      );
+      const { stdout } = await execAsync(`df -k "${process.cwd()}" | tail -1 | awk '{print $4}'`);
       const availableKB = Number.parseInt(stdout.trim(), 10);
 
       if (Number.isNaN(availableKB)) {
@@ -134,4 +132,3 @@ export class PreflightChecker {
     await this.checkDiskSpace();
   }
 }
-

@@ -1,5 +1,5 @@
+import { type AppError, ErrorCode, type FormattedError } from '@multiverse/core';
 import chalk from 'chalk';
-import { ErrorCode, type AppError, type FormattedError } from '@multiverse/core';
 
 const validErrorCodes: string[] = Object.values(ErrorCode);
 

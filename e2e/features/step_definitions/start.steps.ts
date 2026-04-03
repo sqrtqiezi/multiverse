@@ -189,6 +189,9 @@ When('I run {string}', async (command: string) => {
     }
     env.HOME = path.join(repoRoot, '.e2e-tmp-home-with-creds');
     await fs.mkdir(env.HOME, { recursive: true });
+    // Create .claude directory for preflight checks
+    const claudeDir = path.join(env.HOME, '.claude');
+    await fs.mkdir(claudeDir, { recursive: true });
     env.ANTHROPIC_API_KEY = 'sk-ant-e2e-dummy-key';
   }
 

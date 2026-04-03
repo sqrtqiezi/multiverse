@@ -6,14 +6,15 @@ Feature: Zero-config container start
   Scenario: Docker is not available
     Given Docker is not running
     When I run "multiverse start"
-    Then the output should contain "Docker is not available"
+    Then the output should contain "Docker 不可用"
+    And the output should contain "docker --version"
     And the exit code should be 1
 
   Scenario: Credentials not found
     Given Docker is available
     And Claude credentials do not exist
     When I run "multiverse start"
-    Then the output should contain "Claude credentials not found"
+    Then the output should contain "Claude 凭证未找到"
     And the exit code should be 1
 
   Scenario: Start container successfully

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { ErrorCode, type FormattedError } from '@multiverse/core';
+import { describe, expect, it } from 'vitest';
 import { formatErrorOutput, toAppError } from '../error-formatter.js';
 
 describe('formatErrorOutput', () => {

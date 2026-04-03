@@ -32,7 +32,10 @@ describe('Error Templates', () => {
   it('should have non-empty title and description', () => {
     for (const [code, template] of Object.entries(ERROR_TEMPLATES)) {
       expect(template.title.length, `${code} title should not be empty`).toBeGreaterThan(0);
-      expect(template.description.length, `${code} description should not be empty`).toBeGreaterThan(0);
+      expect(
+        template.description.length,
+        `${code} description should not be empty`,
+      ).toBeGreaterThan(0);
     }
   });
 
@@ -49,7 +52,7 @@ describe('Error Templates', () => {
       expect(template.title).toContain('Docker');
       expect(template.description).toBeDefined();
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('docker --version'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('docker --version'))).toBe(true);
     });
   });
 
@@ -59,7 +62,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('权限');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('usermod -aG docker'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('usermod -aG docker'))).toBe(true);
     });
   });
 
@@ -69,7 +72,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('凭证');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('ANTHROPIC_API_KEY'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('ANTHROPIC_API_KEY'))).toBe(true);
     });
   });
 
@@ -79,7 +82,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('凭证');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('sk-ant-'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('sk-ant-'))).toBe(true);
     });
   });
 
@@ -89,7 +92,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('容器');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('docker logs'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('docker logs'))).toBe(true);
     });
   });
 
@@ -99,7 +102,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('镜像');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('docker pull'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('docker pull'))).toBe(true);
     });
   });
 
@@ -109,7 +112,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('工作区');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('chmod'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('chmod'))).toBe(true);
     });
   });
 
@@ -119,7 +122,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('磁盘');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('docker system prune'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('docker system prune'))).toBe(true);
     });
   });
 
@@ -129,7 +132,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('Verse');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('.verse.json'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('.verse.json'))).toBe(true);
     });
   });
 
@@ -139,8 +142,7 @@ describe('Error Templates', () => {
 
       expect(template.title).toContain('未知');
       expect(template.suggestions).toHaveLength(3);
-      expect(template.suggestions.some(s => s.includes('GitHub'))).toBe(true);
+      expect(template.suggestions.some((s) => s.includes('GitHub'))).toBe(true);
     });
   });
 });
-

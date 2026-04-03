@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { ErrorHandler } from '../error-handler';
+import { describe, expect, it } from 'vitest';
 import { ErrorCode } from '../error-codes';
+import { ErrorHandler } from '../error-handler';
 import { ERROR_TEMPLATES } from '../error-templates';
 import type { AppError } from '../types';
 
@@ -17,7 +17,9 @@ describe('ErrorHandler', () => {
       const formatted = handler.format(error);
 
       expect(formatted.title).toBe('Docker 不可用');
-      expect(formatted.description).toBe('无法连接到 Docker 守护进程。Multiverse 需要 Docker 来运行 Verse 容器。');
+      expect(formatted.description).toBe(
+        '无法连接到 Docker 守护进程。Multiverse 需要 Docker 来运行 Verse 容器。',
+      );
       expect(formatted.suggestions).toBeInstanceOf(Array);
       expect(formatted.suggestions).toHaveLength(3);
       expect(formatted.exitCode).toBe(1);
@@ -93,10 +95,7 @@ describe('ErrorHandler', () => {
       const originalTemplate = ERROR_TEMPLATES[ErrorCode.WORKSPACE_NOT_WRITABLE];
       ERROR_TEMPLATES[ErrorCode.WORKSPACE_NOT_WRITABLE] = {
         ...originalTemplate,
-        suggestions: [
-          '检查目录权限：ls -la {path}',
-          '修改目录权限：chmod u+w {path}',
-        ],
+        suggestions: ['检查目录权限：ls -la {path}', '修改目录权限：chmod u+w {path}'],
       };
 
       const formatted = handler.format(error);
