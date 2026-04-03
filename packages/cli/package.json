@@ -18,6 +18,7 @@
   "dependencies": {
     "@multiverse/core": "workspace:*",
     "@multiverse/types": "workspace:*",
+    "chalk": "^5.6.2",
     "commander": "^14.0.3"
   },
   "scripts": {
