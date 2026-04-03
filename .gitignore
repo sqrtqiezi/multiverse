@@ -3,6 +3,7 @@ dist/
 .turbo/
 *.tsbuildinfo
 target/
+.multiverse/
 
 # Tauri
 packages/gui/src-tauri/gen/
