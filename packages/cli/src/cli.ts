@@ -22,16 +22,14 @@ export function run(args: string[]): string {
   const program = createProgram();
   let output = '';
 
-  program
-    .exitOverride()
-    .configureOutput({
-      writeOut: (str) => {
-        output += str;
-      },
-      writeErr: (str) => {
-        output += str;
-      },
-    });
+  program.exitOverride().configureOutput({
+    writeOut: (str) => {
+      output += str;
+    },
+    writeErr: (str) => {
+      output += str;
+    },
+  });
 
   try {
     program.parse(args, { from: 'user' });

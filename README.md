@@ -11,6 +11,7 @@
   - 本地自动构建镜像 `multiverse/claude-code:latest`
   - Claude 凭证自动发现与注入
   - 将当前目录挂载到容器 `/workspace` 并进入交互模式
+  - 运行历史持久化到 `.multiverse/verses/*.json`（每个 Git branch 一个 verse 文件）
 - 进行中：GUI（Tauri + React）目前是基础壳层
 
 ## Monorepo 结构
@@ -58,6 +59,7 @@ node packages/cli/dist/cli.js start
 3. 自动解析 Claude 凭证并注入容器
 4. 挂载当前目录到容器 `/workspace`
 5. 进入 `claude-code` 交互会话
+6. 自动记录 run 开始/结束信息到 `.multiverse/verses/<branch>__<hash>.json`
 
 ## 常用脚本
 
