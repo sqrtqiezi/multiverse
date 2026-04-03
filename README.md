@@ -87,7 +87,7 @@ pnpm --filter @multiverse/gui tauri:dev
 
 - 单元测试：`vitest`
 - E2E：`cucumber-js`（位于 `e2e/`）
-- Docker 相关 E2E 场景默认受环境变量控制，仅在设置 `MULTIVERSE_E2E_DOCKER=1` 时执行 Docker 依赖步骤
+- E2E 默认要求 Docker 可用（不再通过 `MULTIVERSE_E2E_DOCKER` 门控）
 
 ## 故障排查
 

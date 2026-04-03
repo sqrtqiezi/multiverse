@@ -8,3 +8,4 @@ export interface AgentConfig {
 }
 
 export * from './docker.js';
+export * from './verse.js';

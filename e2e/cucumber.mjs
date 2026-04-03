@@ -3,5 +3,10 @@ export default {
   paths: ['features/**/*.feature'],
   require: ['features/step_definitions/**/*.ts'],
   requireModule: ['tsx'],
-  format: ['progress-bar', 'html:reports/cucumber-report.html'],
+  format: [
+    'progress',
+    'summary',
+    'html:reports/cucumber-report.html',
+    'rerun:reports/rerun.txt',
+  ],
 };

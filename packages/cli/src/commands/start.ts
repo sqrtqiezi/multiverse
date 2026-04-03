@@ -1,7 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ContainerManager, CredentialResolver, DockerClient, ImageBuilder } from '@multiverse/core';
+import {
+  ContainerManager,
+  CredentialResolver,
+  DockerClient,
+  ImageBuilder,
+  VerseService,
+} from '@multiverse/core';
 import type { ContainerConfig } from '@multiverse/types';
 import type { Container } from 'dockerode';
 
@@ -76,6 +83,10 @@ export async function startCommand(): Promise<void> {
   }
   console.log();
 
+  const verseService = new VerseService();
+  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
+  console.log(`✓ Verse ready for branch ${verse.branch}\n`);
+
   // Step 4: Create container config
   const workspaceMount = {
     hostPath: process.cwd(),
@@ -95,8 +106,18 @@ export async function startCommand(): Promise<void> {
   const containerManager = new ContainerManager(dockerClient);
 
   let container: Container | undefined;
+  let runStarted = false;
+  let runFinalized = false;
+  const runId = randomUUID();
+  const startedAt = new Date().toISOString();
   try {
     container = await containerManager.createAndStart(config);
+    await verseService.appendRunStart({
+      cwd: process.cwd(),
+      runId,
+      startAt: startedAt,
+    });
+    runStarted = true;
     console.log('✓ Container started\n');
     console.log('Entering claude-code interactive mode...\n');
     console.log('─'.repeat(50));
@@ -107,6 +128,14 @@ export async function startCommand(): Promise<void> {
 
     // Step 7: Wait for exit
     const exitCode = await containerManager.waitForExit(container);
+    await verseService.finalizeRun({
+      cwd: process.cwd(),
+      runId,
+      endAt: new Date().toISOString(),
+      exitCode,
+      containerId: container.id,
+    });
+    runFinalized = true;
 
     console.log();
     console.log('─'.repeat(50));
@@ -115,6 +144,20 @@ export async function startCommand(): Promise<void> {
     process.exit(exitCode);
   } catch (error) {
     console.error('\n❌ Failed to start container:', error);
+
+    if (runStarted && !runFinalized && container) {
+      try {
+        await verseService.finalizeRun({
+          cwd: process.cwd(),
+          runId,
+          endAt: new Date().toISOString(),
+          exitCode: 1,
+          containerId: container.id,
+        });
+      } catch (finalizeError) {
+        console.error('❌ Failed to finalize verse run:', finalizeError);
+      }
+    }
 
     if (container) {
       await containerManager.remove(container);

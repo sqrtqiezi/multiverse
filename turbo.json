@@ -15,7 +15,8 @@
     },
     "test:e2e": {
       "dependsOn": ["build"],
-      "cache": false
+      "cache": false,
+      "env": ["MULTIVERSE_E2E_START_TIMEOUT_MS"]
     },
     "lint": {
       "cache": false

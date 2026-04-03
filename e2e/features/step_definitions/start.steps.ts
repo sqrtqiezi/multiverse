@@ -4,15 +4,22 @@ import { exec } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { Given, Then, When } from '@cucumber/cucumber';
+import { Given, Then, When, setDefaultTimeout } from '@cucumber/cucumber';
 
 const execAsync = promisify(exec);
-const runDockerScenarios = process.env.MULTIVERSE_E2E_DOCKER === '1';
+const startCommandTimeoutMs = Number(process.env.MULTIVERSE_E2E_START_TIMEOUT_MS ?? '120000');
 const verseDir = '.multiverse/verses';
+setDefaultTimeout(startCommandTimeoutMs + 5000);
+
+type ScenarioDockerMode = 'normal' | 'unavailable';
+type ScenarioCredentialMode = 'exists' | 'missing';
 
 let commandOutput = '';
 let commandExitCode = 0;
 let lastObservedRunCount: number | undefined;
+let dockerMode: ScenarioDockerMode = 'normal';
+let credentialMode: ScenarioCredentialMode = 'exists';
+let cliBuilt = false;
 
 async function getRepoRoot() {
   const { stdout } = await execAsync('git rev-parse --show-toplevel');
@@ -20,28 +27,26 @@ async function getRepoRoot() {
 }
 
 async function getCurrentBranch() {
-  const { stdout } = await execAsync('git branch --show-current');
+  const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD');
   const branch = stdout.trim();
 
-  if (!branch) {
-    return 'detached-head';
+  if (branch === 'HEAD') {
+    const commit = (await execAsync('git rev-parse --short HEAD')).stdout.trim();
+    return `detached-${commit}`;
   }
 
   return branch;
 }
 
 function sanitizeBranchName(branch: string) {
-  return branch.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return branch.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_');
 }
 
 function getVersePathCandidates(repoRoot: string, branch: string) {
   const sanitizedBranch = sanitizeBranchName(branch);
   const branchHash = createHash('sha1').update(branch).digest('hex').slice(0, 8);
 
-  return [
-    path.join(repoRoot, verseDir, `${sanitizedBranch}.json`),
-    path.join(repoRoot, verseDir, `${sanitizedBranch.toLowerCase()}-${branchHash}.json`),
-  ];
+  return [path.join(repoRoot, verseDir, `${sanitizedBranch}__${branchHash}.json`)];
 }
 
 async function pathExists(filePath: string) {
@@ -84,6 +89,17 @@ async function readCurrentVerse() {
   };
 }
 
+async function ensureCliBuilt(repoRoot: string) {
+  if (cliBuilt) {
+    return;
+  }
+
+  await execAsync('pnpm --filter @multiverse/types build', { cwd: repoRoot });
+  await execAsync('pnpm --filter @multiverse/core build', { cwd: repoRoot });
+  await execAsync('pnpm --filter @multiverse/cli build', { cwd: repoRoot });
+  cliBuilt = true;
+}
+
 async function assertVerseFileAbsent() {
   const { candidates } = await resolveCurrentVersePath();
   const existingPaths = [];
@@ -114,48 +130,80 @@ async function findExistingVersePath() {
 }
 
 Given('Docker is not running', async function () {
-  if (!runDockerScenarios) {
-    return 'skipped';
-  }
+  dockerMode = 'unavailable';
 });
 
 Given('Docker is available', async function () {
-  if (!runDockerScenarios) {
-    return 'skipped';
-  }
+  dockerMode = 'normal';
 
   try {
     await execAsync('docker ps');
-  } catch {
-    return 'skipped';
+  } catch (error) {
+    throw new Error(`Docker is required for this scenario: ${String(error)}`);
   }
 });
 
 Given('Claude credentials do not exist', async function () {
-  if (!runDockerScenarios) {
-    return 'skipped';
-  }
+  credentialMode = 'missing';
 });
 
 Given('Claude credentials exist', async function () {
-  if (!runDockerScenarios) {
-    return 'skipped';
-  }
+  credentialMode = 'exists';
 });
 
 Given('verse file for current branch should not exist', async () => {
+  const { candidates } = await resolveCurrentVersePath();
+  for (const candidatePath of candidates) {
+    await fs.rm(candidatePath, { force: true });
+  }
   await assertVerseFileAbsent();
   lastObservedRunCount = undefined;
 });
 
 When('I run {string}', async (command: string) => {
+  const repoRoot = await getRepoRoot();
+  await ensureCliBuilt(repoRoot);
+  const commandToRun =
+    command === 'multiverse start' ? 'node packages/cli/dist/cli.js start' : command;
+  const env = { ...process.env } as Record<string, string | undefined>;
+
+  if (dockerMode === 'unavailable') {
+    env.DOCKER_HOST = 'unix:///var/run/nonexistent-docker.sock';
+  } else {
+    delete env.DOCKER_HOST;
+  }
+
+  if (credentialMode === 'missing') {
+    for (const key of Object.keys(env)) {
+      if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) {
+        delete env[key];
+      }
+    }
+    env.HOME = path.join(repoRoot, '.e2e-tmp-home-no-creds');
+    await fs.mkdir(env.HOME, { recursive: true });
+  } else {
+    for (const key of Object.keys(env)) {
+      if (key.startsWith('ANTHROPIC_') || key.startsWith('CLAUDE_CODE_')) {
+        delete env[key];
+      }
+    }
+    env.HOME = path.join(repoRoot, '.e2e-tmp-home-with-creds');
+    await fs.mkdir(env.HOME, { recursive: true });
+    env.ANTHROPIC_API_KEY = 'sk-ant-e2e-dummy-key';
+  }
+
   try {
-    const result = await execAsync(command, { timeout: 5000 });
+    const result = await execAsync(commandToRun, {
+      cwd: repoRoot,
+      env: env as NodeJS.ProcessEnv,
+      timeout: startCommandTimeoutMs,
+    });
     commandOutput = result.stdout + result.stderr;
     commandExitCode = 0;
-  } catch (error: any) {
-    commandOutput = error.stdout + error.stderr;
-    commandExitCode = error.code || 1;
+  } catch (error: unknown) {
+    const execError = error as { stdout?: string; stderr?: string; code?: number };
+    commandOutput = (execError.stdout ?? '') + (execError.stderr ?? '');
+    commandExitCode = execError.code ?? 1;
   }
 });
 

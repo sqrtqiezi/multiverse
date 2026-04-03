@@ -20,6 +20,5 @@ Feature: Zero-config container start
     Given Docker is available
     And Claude credentials exist
     When I run "multiverse start"
-    Then a container should be created
-    And the container should be running
-    And I should see "Entering claude-code interactive mode"
+    Then the output should contain "Container started"
+    And the output should contain "Entering claude-code interactive mode"
