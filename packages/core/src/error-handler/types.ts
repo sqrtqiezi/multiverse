@@ -2,6 +2,7 @@ import type { ErrorCode } from './error-codes.js';
 
 export interface AppError {
   code: ErrorCode;
+  message?: string;
   cause?: Error;
   context?: Record<string, unknown>;
 }
