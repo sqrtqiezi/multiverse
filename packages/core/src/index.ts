@@ -9,7 +9,14 @@ export { CredentialResolver } from './docker/credential-resolver.js';
 // Export Docker modules
 export { DockerClient } from './docker/docker-client.js';
 export { ImageBuilder } from './docker/image-builder.js';
+// Export error handling modules
+export { ErrorCode } from './error-handler/error-codes.js';
+export { ErrorHandler } from './error-handler/error-handler.js';
+export { ERROR_TEMPLATES } from './error-handler/error-templates.js';
+export type { AppError, ErrorTemplate, FormattedError } from './error-handler/types.js';
 export { BranchResolver } from './git/branch-resolver.js';
+// Export preflight checks
+export { PreflightChecker } from './preflight/index.js';
 export {
   getVersePath,
   getVersesDir,

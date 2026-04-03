@@ -1,6 +1,6 @@
-import { ErrorCode } from './error-codes';
-import { ERROR_TEMPLATES } from './error-templates';
-import type { AppError, FormattedError } from './types';
+import { ErrorCode } from './error-codes.js';
+import { ERROR_TEMPLATES } from './error-templates.js';
+import type { AppError, FormattedError } from './types.js';
 
 export class ErrorHandler {
   format(error: AppError): FormattedError {
@@ -11,7 +11,7 @@ export class ErrorHandler {
       title: template.title,
       description: this.replaceVariables(template.description, error.context),
       reason: template.reason,
-      suggestions: template.suggestions.map((s) =>
+      suggestions: template.suggestions.map((s: string) =>
         this.replaceVariables(s, error.context)
       ),
       exitCode: template.exitCode,
