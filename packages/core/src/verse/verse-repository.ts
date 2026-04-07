@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { PersistedVerse, PersistedVerseV1, Verse } from '@multiverse/types';
+import type { PersistedVerse, PersistedVerseV1, PersistedVerseV2, Verse } from '@multiverse/types';
 import { CLAUDE_HOME_CONTAINER_PATH, getVerseEnvironmentHostPath } from './claude-home.js';
 import { VerseCorruptedError, VerseLockTimeoutError } from './errors.js';
 import { getVersePath } from './verse-path.js';
 
 type WriteVerseInput = {
   branch: string;
+  templateId: string;
   mutate: (verse: Verse) => void | Promise<void>;
 };
 
@@ -22,7 +23,7 @@ export class VerseRepository {
     return this.normalizeVerse(this.parseVerse(rawContent, versePath));
   }
 
-  async writeVerse({ branch, mutate }: WriteVerseInput): Promise<Verse> {
+  async writeVerse({ branch, templateId, mutate }: WriteVerseInput): Promise<Verse> {
     const versePath = getVersePath(this.projectRoot, branch);
     const lockPath = `${versePath}.lock`;
 
@@ -30,7 +31,7 @@ export class VerseRepository {
     await this.acquireLock(lockPath);
 
     try {
-      const verse = await this.loadOrCreateVerse(versePath, branch);
+      const verse = await this.loadOrCreateVerse(versePath, branch, templateId);
       verse.branch = branch;
       await fs.mkdir(verse.environment.hostPath, { recursive: true });
       await fs.chmod(verse.environment.hostPath, 0o755);
@@ -45,27 +46,34 @@ export class VerseRepository {
     }
   }
 
-  private async loadOrCreateVerse(versePath: string, branch: string): Promise<Verse> {
+  private async loadOrCreateVerse(
+    versePath: string,
+    branch: string,
+    templateId: string,
+  ): Promise<Verse> {
     try {
-      return await this.readVerse(versePath);
+      const rawContent = await fs.readFile(versePath, 'utf8');
+      const persisted = this.parseVerse(rawContent, versePath);
+      return this.normalizeVerseForBranch(persisted, branch, templateId);
     } catch (error) {
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return this.createVerse(branch);
+        return this.createVerse(branch, templateId);
       }
 
       throw error;
     }
   }
 
-  private createVerse(branch: string): Verse {
+  private createVerse(branch: string, templateId: string): Verse {
     const now = new Date().toISOString();
     const id = randomUUID();
 
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       id,
       branch,
       projectRoot: this.projectRoot,
+      templateId,
       environment: {
         hostPath: getVerseEnvironmentHostPath(this.projectRoot, id),
         containerPath: CLAUDE_HOME_CONTAINER_PATH,
@@ -145,19 +153,30 @@ export class VerseRepository {
   }
 
   private normalizeVerse(verse: PersistedVerse): Verse {
-    return this.normalizeVerseForBranch(verse, verse.branch);
+    return this.normalizeVerseForBranch(verse, verse.branch, '');
   }
 
-  private normalizeVerseForBranch(verse: PersistedVerse, branch: string): Verse {
+  private normalizeVerseForBranch(
+    verse: PersistedVerse,
+    branch: string,
+    templateId: string,
+  ): Verse {
     const initializedAt =
-      verse.schemaVersion === 2 ? verse.environment.initializedAt : verse.createdAt;
+      verse.schemaVersion === 2 || verse.schemaVersion === 1
+        ? verse.schemaVersion === 2
+          ? verse.environment.initializedAt
+          : verse.createdAt
+        : verse.environment.initializedAt;
+
+    const existingTemplateId = verse.schemaVersion === 3 ? verse.templateId : undefined;
     const activeProjectRoot = this.projectRoot;
 
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       id: verse.id,
       branch,
       projectRoot: activeProjectRoot,
+      templateId: existingTemplateId ?? templateId,
       environment: {
         hostPath: getVerseEnvironmentHostPath(activeProjectRoot, verse.id),
         containerPath: CLAUDE_HOME_CONTAINER_PATH,
@@ -170,7 +189,11 @@ export class VerseRepository {
   }
 
   private isPersistedVerse(value: unknown): value is PersistedVerse {
-    return this.isPersistedVerseV1(value) || this.isPersistedVerseV2(value);
+    return (
+      this.isPersistedVerseV1(value) ||
+      this.isPersistedVerseV2(value) ||
+      this.isPersistedVerseV3(value)
+    );
   }
 
   private isPersistedVerseV1(value: unknown): value is PersistedVerseV1 {
@@ -191,7 +214,32 @@ export class VerseRepository {
     );
   }
 
-  private isPersistedVerseV2(value: unknown): value is Verse {
+  private isPersistedVerseV2(value: unknown): value is PersistedVerseV2 {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const candidate = value as Partial<PersistedVerseV2>;
+    const environment = candidate.environment;
+
+    return (
+      candidate.schemaVersion === 2 &&
+      typeof candidate.id === 'string' &&
+      typeof candidate.branch === 'string' &&
+      typeof candidate.projectRoot === 'string' &&
+      typeof candidate.createdAt === 'string' &&
+      typeof candidate.updatedAt === 'string' &&
+      Array.isArray(candidate.runs) &&
+      candidate.runs.every((run) => this.isRunRecord(run)) &&
+      typeof environment === 'object' &&
+      environment !== null &&
+      typeof environment.hostPath === 'string' &&
+      typeof environment.containerPath === 'string' &&
+      typeof environment.initializedAt === 'string'
+    );
+  }
+
+  private isPersistedVerseV3(value: unknown): value is Verse {
     if (typeof value !== 'object' || value === null) {
       return false;
     }
@@ -200,10 +248,11 @@ export class VerseRepository {
     const environment = candidate.environment;
 
     return (
-      candidate.schemaVersion === 2 &&
+      candidate.schemaVersion === 3 &&
       typeof candidate.id === 'string' &&
       typeof candidate.branch === 'string' &&
       typeof candidate.projectRoot === 'string' &&
+      typeof candidate.templateId === 'string' &&
       typeof candidate.createdAt === 'string' &&
       typeof candidate.updatedAt === 'string' &&
       Array.isArray(candidate.runs) &&

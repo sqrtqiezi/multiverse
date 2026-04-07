@@ -287,7 +287,7 @@ export async function startCommand(): Promise<void> {
   }
 
   const verseService = new VerseService();
-  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
+  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), '');
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
   await syncCredentialFilesIntoVerseHome(verse.environment.hostPath, credentials);
@@ -319,6 +319,7 @@ export async function startCommand(): Promise<void> {
       cwd: process.cwd(),
       runId,
       startAt: startedAt,
+      templateId: '',
     });
     runStarted = true;
 
@@ -353,6 +354,7 @@ export async function startCommand(): Promise<void> {
       endAt: new Date().toISOString(),
       exitCode,
       containerId: container.id,
+      templateId: '',
     });
     runFinalized = true;
 
@@ -374,6 +376,7 @@ export async function startCommand(): Promise<void> {
           endAt: new Date().toISOString(),
           exitCode: 1,
           containerId: container.id,
+          templateId: '',
         });
       } catch (finalizeError) {
         console.error('Failed to finalize verse run:', finalizeError);
