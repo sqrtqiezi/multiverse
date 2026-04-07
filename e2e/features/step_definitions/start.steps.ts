@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { After, Before, Given, setDefaultTimeout, Then, When } from '@cucumber/cucumber';
+import { sharedState } from './shared-state.js';
 
 const execAsync = promisify(exec);
 const startCommandTimeoutMs = Number(process.env.MULTIVERSE_E2E_START_TIMEOUT_MS ?? '60000');
@@ -318,8 +319,9 @@ Given('verse file for current branch should not exist', async () => {
 When('I run {string}', async (command: string) => {
   const repoRoot = await getRepoRoot();
   await ensureCliBuilt(repoRoot);
-  const commandToRun =
-    command === 'multiverse start' ? 'node packages/cli/dist/cli.js start' : command;
+  const commandToRun = command.startsWith('multiverse ')
+    ? `node packages/cli/dist/cli.js ${command.slice('multiverse '.length)}`
+    : command;
   const env = { ...process.env } as Record<string, string | undefined>;
 
   if (dockerMode === 'unavailable') {
@@ -379,6 +381,9 @@ When('I run {string}', async (command: string) => {
     commandOutput = (execError.stdout ?? '') + (execError.stderr ?? '');
     commandExitCode = execError.code ?? 1;
   }
+
+  sharedState.commandOutput = commandOutput;
+  sharedState.commandExitCode = commandExitCode;
 
   if (commandToRun === 'node packages/cli/dist/cli.js start') {
     await recordLatestRunContainerId();
