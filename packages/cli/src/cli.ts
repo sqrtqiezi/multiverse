@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { startCommand } from './commands/start.js';
+import { createTemplateCommand } from './commands/template.js';
 
 const CLI_NAME = 'multiverse';
 const CLI_VERSION = '0.0.1';
@@ -10,6 +11,9 @@ function createProgram() {
   program.name(CLI_NAME).version(CLI_VERSION).description('Coding agent harness management tool');
 
   program.command('start').description('Start a containerized coding agent').action(startCommand);
+
+  const { command: templateCommand } = createTemplateCommand();
+  program.addCommand(templateCommand);
 
   return program;
 }
