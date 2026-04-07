@@ -30,3 +30,10 @@ export {
 export { VerseRepository } from './verse/verse-repository.js';
 export { VerseService } from './verse/verse-service.js';
 export type { AgentConfig };
+
+// Export template modules
+export { createConfigSnapshot } from './template/config-snapshot.js';
+export { TemplateRepository } from './template/template-repository.js';
+export { TemplateService } from './template/template-service.js';
+export { TemplateValidator } from './template/template-validator.js';
+export type { ValidationResult } from './template/template-validator.js';
