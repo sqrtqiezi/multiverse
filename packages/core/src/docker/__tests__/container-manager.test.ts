@@ -1,5 +1,5 @@
-import type { ContainerConfig } from '@multiverse/types';
 import { PassThrough } from 'node:stream';
+import type { ContainerConfig } from '@multiverse/types';
 import { describe, expect, it, vi } from 'vitest';
 import { ContainerManager } from '../container-manager.js';
 
@@ -8,7 +8,7 @@ describe('ContainerManager', () => {
     const dockerClient = {
       getDocker: () => ({ createContainer: vi.fn() }),
     } as any;
-    const manager = new ContainerManager(dockerClient);
+    const _manager = new ContainerManager(dockerClient);
 
     const config: ContainerConfig = {
       image: 'multiverse/claude-code:latest',

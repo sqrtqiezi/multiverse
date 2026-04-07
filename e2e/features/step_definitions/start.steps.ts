@@ -1,10 +1,10 @@
 import assert from 'node:assert';
-import { createHash } from 'node:crypto';
 import { exec } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { After, Before, Given, Then, When, setDefaultTimeout } from '@cucumber/cucumber';
+import { After, Before, Given, setDefaultTimeout, Then, When } from '@cucumber/cucumber';
 
 const execAsync = promisify(exec);
 const startCommandTimeoutMs = Number(process.env.MULTIVERSE_E2E_START_TIMEOUT_MS ?? '60000');
@@ -19,11 +19,13 @@ let commandOutput = '';
 let commandExitCode = 0;
 let lastObservedRunCount: number | undefined;
 let rememberedEnvironmentPath: string | undefined;
-let rememberedEnvironmentMarker: {
-  content: string;
-  inode: number;
-  path: string;
-} | undefined;
+let rememberedEnvironmentMarker:
+  | {
+      content: string;
+      inode: number;
+      path: string;
+    }
+  | undefined;
 let recordedContainerIds: string[] = [];
 let markerWritingPromptMode = false;
 let dockerMode: ScenarioDockerMode = 'normal';
@@ -32,7 +34,8 @@ let backendMode: ScenarioBackendMode = 'default';
 let cliBuilt = false;
 let ollamaRuntimeReady = false;
 
-const ollamaExpectedToken = process.env.MULTIVERSE_E2E_OLLAMA_EXPECTED_TOKEN ?? 'E2E_OLLAMA_OK_20260403';
+const ollamaExpectedToken =
+  process.env.MULTIVERSE_E2E_OLLAMA_EXPECTED_TOKEN ?? 'E2E_OLLAMA_OK_20260403';
 const ollamaPrompt = `printf '%s\\n' '${ollamaExpectedToken}'`;
 const ollamaScriptedPrompt = `printf '%s\\n' '${ollamaExpectedToken}'; printf '%s\\n' '${ollamaExpectedToken}' > ~/.claude/e2e-marker.txt`;
 
@@ -95,7 +98,10 @@ async function getCurrentBranch() {
 }
 
 function sanitizeBranchName(branch: string) {
-  return branch.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+  return branch
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '_');
 }
 
 function getVersePathCandidates(repoRoot: string, branch: string) {
@@ -266,11 +272,11 @@ Before(() => {
   resetScenarioState();
 });
 
-Given('Docker is not running', async function () {
+Given('Docker is not running', async () => {
   dockerMode = 'unavailable';
 });
 
-Given('Docker is available', async function () {
+Given('Docker is available', async () => {
   dockerMode = 'normal';
 
   try {
@@ -280,21 +286,21 @@ Given('Docker is available', async function () {
   }
 });
 
-Given('Claude credentials do not exist', async function () {
+Given('Claude credentials do not exist', async () => {
   credentialMode = 'missing';
 });
 
-Given('Claude credentials exist', async function () {
+Given('Claude credentials exist', async () => {
   credentialMode = 'exists';
 });
 
-Given('Ollama Anthropic-compatible API is available', async function () {
+Given('Ollama Anthropic-compatible API is available', async () => {
   backendMode = 'ollama';
   await invokeAnthropicCompatibleApi(getOllamaHostBaseUrl(), ollamaPrompt);
   ollamaRuntimeReady = true;
 });
 
-Given('marker-writing prompt mode is enabled', async function () {
+Given('marker-writing prompt mode is enabled', async () => {
   markerWritingPromptMode = true;
 });
 
@@ -484,29 +490,32 @@ Then('current branch verse should reuse the remembered environment path', async 
   );
 });
 
-Then('current branch verse environment directory should contain the remembered marker', async () => {
-  const { content, inode, markerPath } = await readVerseEnvironmentMarker();
+Then(
+  'current branch verse environment directory should contain the remembered marker',
+  async () => {
+    const { content, inode, markerPath } = await readVerseEnvironmentMarker();
 
-  assert.ok(
-    rememberedEnvironmentMarker,
-    'Expected a remembered environment marker before checking reuse',
-  );
-  assert.strictEqual(
-    markerPath,
-    rememberedEnvironmentMarker.path,
-    `Expected marker path to remain ${rememberedEnvironmentMarker.path}, but found ${markerPath}`,
-  );
-  assert.strictEqual(
-    content,
-    rememberedEnvironmentMarker.content,
-    `Expected marker content to remain ${rememberedEnvironmentMarker.content}, but found ${content}`,
-  );
-  assert.strictEqual(
-    inode,
-    rememberedEnvironmentMarker.inode,
-    `Expected marker inode to remain ${rememberedEnvironmentMarker.inode}, but found ${inode}`,
-  );
-});
+    assert.ok(
+      rememberedEnvironmentMarker,
+      'Expected a remembered environment marker before checking reuse',
+    );
+    assert.strictEqual(
+      markerPath,
+      rememberedEnvironmentMarker.path,
+      `Expected marker path to remain ${rememberedEnvironmentMarker.path}, but found ${markerPath}`,
+    );
+    assert.strictEqual(
+      content,
+      rememberedEnvironmentMarker.content,
+      `Expected marker content to remain ${rememberedEnvironmentMarker.content}, but found ${content}`,
+    );
+    assert.strictEqual(
+      inode,
+      rememberedEnvironmentMarker.inode,
+      `Expected marker inode to remain ${rememberedEnvironmentMarker.inode}, but found ${inode}`,
+    );
+  },
+);
 
 Then('verse file for current branch should have one more run', async () => {
   const { verse, versePath } = await readCurrentVerse();
@@ -542,4 +551,31 @@ Then('the recorded multiverse containers are removed', async () => {
       `Expected observed container ${containerId} to be removed, but it is still present`,
     );
   }
+});
+
+Then('latest run in current branch verse should contain finish fields', async () => {
+  const { verse, versePath } = await readCurrentVerse();
+
+  assert(
+    Array.isArray(verse.runs) && verse.runs.length > 0,
+    `Expected at least one run in ${versePath}`,
+  );
+
+  const latestRun = verse.runs.at(-1);
+
+  assert.strictEqual(
+    typeof latestRun.endAt,
+    'string',
+    `Expected latest run endAt to be a string in ${versePath}, got ${typeof latestRun.endAt}`,
+  );
+  assert.strictEqual(
+    typeof latestRun.exitCode,
+    'number',
+    `Expected latest run exitCode to be a number in ${versePath}, got ${typeof latestRun.exitCode}`,
+  );
+  assert.strictEqual(
+    typeof latestRun.containerId,
+    'string',
+    `Expected latest run containerId to be a string in ${versePath}, got ${typeof latestRun.containerId}`,
+  );
 });

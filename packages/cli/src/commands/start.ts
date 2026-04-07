@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { createServer, request as httpRequest, type Server } from 'node:http';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
+import { createServer, request as httpRequest, type Server } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppError } from '@multiverse/core';
 import {
+  CLAUDE_HOME_CONTAINER_PATH,
   ContainerManager,
   CredentialResolver,
   DockerClient,
@@ -79,6 +80,11 @@ async function startAnthropicBaseUrlProxy(
   const upstreamBaseUrl = new URL(originalBaseUrl);
   const requestImpl = upstreamBaseUrl.protocol === 'https:' ? httpsRequest : httpRequest;
   const server = createServer((req, res) => {
+    req.setTimeout(30_000, () => {
+      res.statusCode = 408;
+      res.end('proxy request timeout');
+    });
+
     const upstream = requestImpl(
       {
         hostname: upstreamBaseUrl.hostname,
@@ -86,12 +92,19 @@ async function startAnthropicBaseUrlProxy(
         path: req.url || '/',
         method: req.method,
         headers: req.headers,
+        timeout: 30_000,
       },
       (upstreamResponse) => {
         res.writeHead(upstreamResponse.statusCode ?? 502, upstreamResponse.headers);
         upstreamResponse.pipe(res);
       },
     );
+
+    upstream.on('timeout', () => {
+      upstream.destroy();
+      res.statusCode = 504;
+      res.end('proxy upstream timeout');
+    });
 
     upstream.on('error', (error) => {
       res.statusCode = 502;
@@ -100,6 +113,8 @@ async function startAnthropicBaseUrlProxy(
 
     req.pipe(upstream);
   });
+
+  server.maxConnections = 50;
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -139,9 +154,8 @@ function getContainerUser(): string | undefined {
 }
 
 function getInteractiveTerminalEnv(): Record<string, string> {
-  const term = process.env.TERM && process.env.TERM !== 'dumb'
-    ? process.env.TERM
-    : 'xterm-256color';
+  const term =
+    process.env.TERM && process.env.TERM !== 'dumb' ? process.env.TERM : 'xterm-256color';
   const env: Record<string, string> = { TERM: term };
 
   if (process.env.COLORTERM) {
@@ -159,7 +173,10 @@ export async function syncCredentialFilesIntoVerseHome(
   credentials: CredentialConfig,
 ): Promise<void> {
   for (const credentialFile of credentials.filePaths) {
-    const relativeTargetPath = path.relative('/home/coder', credentialFile.containerPath);
+    const relativeTargetPath = path.relative(
+      CLAUDE_HOME_CONTAINER_PATH,
+      credentialFile.containerPath,
+    );
 
     if (
       relativeTargetPath.startsWith('..') ||
@@ -297,40 +314,28 @@ export async function startCommand(): Promise<void> {
   const runId = randomUUID();
   const startedAt = new Date().toISOString();
   try {
-    if (scriptedPrompt) {
-      container = await containerManager.createAndStart(config);
-      console.log('✓ Container started\n');
-      console.log('Running claude-code scripted prompt mode...\n');
-      console.log('─'.repeat(50));
-      console.log();
-    } else {
-      container = await containerManager.createAndStart(config);
-      await verseService.appendRunStart({
-        cwd: process.cwd(),
-        runId,
-        startAt: startedAt,
-      });
-      runStarted = true;
-      console.log('✓ Container started\n');
-      console.log('Preparing claude-code interactive mode...\n');
-      console.log('─'.repeat(50));
-      console.log();
-      await containerManager.attach(container);
-    }
-    if (scriptedPrompt) {
-      await verseService.appendRunStart({
-        cwd: process.cwd(),
-        runId,
-        startAt: startedAt,
-      });
-      runStarted = true;
-    }
+    // Record run start BEFORE container launch (both modes)
+    await verseService.appendRunStart({
+      cwd: process.cwd(),
+      runId,
+      startAt: startedAt,
+    });
+    runStarted = true;
+
+    container = await containerManager.createAndStart(config);
+    console.log('✓ Container started\n');
+    console.log(
+      scriptedPrompt
+        ? 'Running claude-code scripted prompt mode...\n'
+        : 'Preparing claude-code interactive mode...\n',
+    );
+    console.log('─'.repeat(50));
+    console.log();
 
     let exitCode: number;
     if (scriptedPrompt) {
       exitCode = await containerManager.waitForExit(container);
       const logs = await containerManager.logs(container);
-
       if (logs.length > 0) {
         process.stdout.write(logs);
         if (!logs.endsWith('\n')) {
@@ -338,7 +343,7 @@ export async function startCommand(): Promise<void> {
         }
       }
     } else {
-      // Step 7: Wait for exit
+      await containerManager.attach(container);
       exitCode = await containerManager.waitForExit(container);
     }
 
@@ -382,10 +387,7 @@ export async function startCommand(): Promise<void> {
 
     // Re-throw as AppError if not already one
     const validErrorCodes = Object.values(ErrorCode);
-    if (
-      (error as AppError).code &&
-      validErrorCodes.includes((error as AppError).code)
-    ) {
+    if ((error as AppError).code && validErrorCodes.includes((error as AppError).code)) {
       throw error;
     }
 

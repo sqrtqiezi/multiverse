@@ -234,7 +234,7 @@ export type Verse = VerseV2;
 export type PersistedVerse = VerseV1 | VerseV2;
 ```
 ```ts
-export const CLAUDE_HOME_CONTAINER_PATH = '/home/coder/.claude';
+export const CLAUDE_HOME_CONTAINER_PATH = '/home/coder';
 
 export function getVerseEnvironmentHostPath(projectRoot: string, verseId: string): string {
   return path.join(projectRoot, '.multiverse', 'verse-envs', verseId, 'claude-home');
@@ -392,7 +392,7 @@ it('includes the verse environment mount when starting a container', async () =>
     projectRoot: '/repo',
     environment: {
       hostPath: '/repo/.multiverse/verse-envs/verse-1/claude-home',
-      containerPath: '/home/coder/.claude',
+      containerPath: '/home/coder',
       initializedAt: '2026-04-03T00:00:00.000Z',
     },
     createdAt: '2026-04-03T00:00:00.000Z',
@@ -402,7 +402,7 @@ it('includes the verse environment mount when starting a container', async () =>
 
   expect(buildContainerConfig({ verse, cwd: '/repo', credentials }).volumes).toContainEqual({
     hostPath: '/repo/.multiverse/verse-envs/verse-1/claude-home',
-    containerPath: '/home/coder/.claude',
+    containerPath: '/home/coder',
     mode: 'rw',
   });
 });

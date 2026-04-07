@@ -30,6 +30,7 @@ Feature: Verse persistence for start runs
     And current branch verse should reuse the remembered environment path
     And current branch verse environment directory should contain the remembered marker
     And verse file for current branch should have one more run
+    And latest run in current branch verse should contain finish fields
 
   Scenario: Start after container cleanup still reuses the same verse environment
     Given verse file for current branch should not exist

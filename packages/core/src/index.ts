@@ -5,8 +5,10 @@ export function greet(): string {
 }
 
 export { ContainerManager } from './docker/container-manager.js';
-export { CredentialResolver } from './docker/credential-resolver.js';
-export { ORIGINAL_ANTHROPIC_BASE_URL_ENV } from './docker/credential-resolver.js';
+export {
+  CredentialResolver,
+  ORIGINAL_ANTHROPIC_BASE_URL_ENV,
+} from './docker/credential-resolver.js';
 // Export Docker modules
 export { DockerClient } from './docker/docker-client.js';
 export { ImageBuilder } from './docker/image-builder.js';
@@ -18,6 +20,7 @@ export type { AppError, ErrorTemplate, FormattedError } from './error-handler/ty
 export { BranchResolver } from './git/branch-resolver.js';
 // Export preflight checks
 export { PreflightChecker } from './preflight/index.js';
+export { CLAUDE_HOME_CONTAINER_PATH } from './verse/claude-home.js';
 export {
   getVersePath,
   getVersesDir,

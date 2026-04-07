@@ -30,13 +30,7 @@ describe('VerseService', () => {
     const service = new VerseService();
 
     const verse = await service.ensureVerseForCurrentBranch(tempDir);
-    const expectedHostPath = path.join(
-      tempDir,
-      '.multiverse',
-      'verse-envs',
-      verse.id,
-      'home',
-    );
+    const expectedHostPath = path.join(tempDir, '.multiverse', 'verse-envs', verse.id, 'home');
     const versesDir = path.join(tempDir, '.multiverse', 'verses');
     const files = await fs.readdir(versesDir);
 
@@ -72,9 +66,7 @@ describe('VerseService', () => {
 
     expect(verse.schemaVersion).toBe(2);
     expect(verse.branch).toMatch(/^detached-/);
-    expect(verse.environment.hostPath).toContain(
-      path.join('.multiverse', 'verse-envs'),
-    );
+    expect(verse.environment.hostPath).toContain(path.join('.multiverse', 'verse-envs'));
   });
 
   it('appends a run start and then finalizes it by runId on schema v2 verses', async () => {

@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PersistedVerse, PersistedVerseV1, Verse } from '@multiverse/types';
-import { VerseCorruptedError, VerseLockTimeoutError } from './errors.js';
 import { CLAUDE_HOME_CONTAINER_PATH, getVerseEnvironmentHostPath } from './claude-home.js';
+import { VerseCorruptedError, VerseLockTimeoutError } from './errors.js';
 import { getVersePath } from './verse-path.js';
 
 type WriteVerseInput = {
@@ -33,9 +33,9 @@ export class VerseRepository {
       const verse = await this.loadOrCreateVerse(versePath, branch);
       verse.branch = branch;
       await fs.mkdir(verse.environment.hostPath, { recursive: true });
-      await fs.chmod(verse.environment.hostPath, 0o777);
+      await fs.chmod(verse.environment.hostPath, 0o755);
       await fs.mkdir(path.join(verse.environment.hostPath, '.claude'), { recursive: true });
-      await fs.chmod(path.join(verse.environment.hostPath, '.claude'), 0o777);
+      await fs.chmod(path.join(verse.environment.hostPath, '.claude'), 0o755);
       await mutate(verse);
       verse.updatedAt = new Date().toISOString();
       await this.atomicWriteVerse(versePath, verse);

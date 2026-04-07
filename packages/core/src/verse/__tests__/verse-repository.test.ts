@@ -52,9 +52,7 @@ describe('VerseRepository', () => {
     expect(verse.schemaVersion).toBe(2);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.branch).toBe(branch);
-    expect(verse.environment.hostPath).toBe(
-      getVerseEnvironmentHostPath(tempDir, verse.id),
-    );
+    expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, verse.id));
     expect(verse.environment.containerPath).toBe(CLAUDE_HOME_CONTAINER_PATH);
     expect(verse.environment.initializedAt).toBeTypeOf('string');
     expect(verse.runs).toEqual([]);
@@ -74,7 +72,7 @@ describe('VerseRepository', () => {
     const stats = await fs.stat(verse.environment.hostPath);
 
     expect(stats.isDirectory()).toBe(true);
-    expect(stats.mode & 0o777).toBe(0o777);
+    expect(stats.mode & 0o777).toBe(0o755);
   });
 
   it('upgrades schema v1 verse data to schema v2 without losing runs', async () => {
@@ -108,14 +106,10 @@ describe('VerseRepository', () => {
     expect(verse.id).toBe(v1Content.id);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.runs).toEqual(v1Content.runs);
-    expect(verse.environment.hostPath).toBe(
-      getVerseEnvironmentHostPath(tempDir, v1Content.id),
-    );
+    expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, v1Content.id));
     expect(persisted.schemaVersion).toBe(2);
     expect(persisted.runs).toEqual(v1Content.runs);
-    expect(persisted.environment.hostPath).toBe(
-      getVerseEnvironmentHostPath(tempDir, v1Content.id),
-    );
+    expect(persisted.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, v1Content.id));
   });
 
   it('normalizes a persisted schema v2 verse back to the active project root', async () => {
@@ -144,9 +138,7 @@ describe('VerseRepository', () => {
 
     expect(verse.schemaVersion).toBe(2);
     expect(verse.projectRoot).toBe(tempDir);
-    expect(verse.environment.hostPath).toBe(
-      getVerseEnvironmentHostPath(tempDir, staleVerse.id),
-    );
+    expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, staleVerse.id));
     expect(verse.environment.containerPath).toBe(CLAUDE_HOME_CONTAINER_PATH);
     expect(verse.environment.initializedAt).toBe(staleVerse.environment.initializedAt);
   });

@@ -73,7 +73,7 @@ export class ContainerManager {
           h: process.stdout.rows || 24,
           w: process.stdout.columns || 80,
         });
-      } catch (err) {
+      } catch (_err) {
         // Ignore resize errors (container might be stopped)
       }
     };
@@ -104,7 +104,7 @@ export class ContainerManager {
   async remove(container: Container): Promise<void> {
     try {
       await container.remove({ force: true });
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors if container already removed (AutoRemove)
     }
   }
