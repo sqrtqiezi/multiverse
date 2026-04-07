@@ -287,7 +287,8 @@ export async function startCommand(): Promise<void> {
   }
 
   const verseService = new VerseService();
-  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), '');
+  const templateId = 'default'; // TODO: Task 12 will add --template support
+  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), templateId);
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
   await syncCredentialFilesIntoVerseHome(verse.environment.hostPath, credentials);
@@ -319,7 +320,7 @@ export async function startCommand(): Promise<void> {
       cwd: process.cwd(),
       runId,
       startAt: startedAt,
-      templateId: '',
+      templateId,
     });
     runStarted = true;
 
@@ -354,7 +355,7 @@ export async function startCommand(): Promise<void> {
       endAt: new Date().toISOString(),
       exitCode,
       containerId: container.id,
-      templateId: '',
+      templateId,
     });
     runFinalized = true;
 
@@ -376,7 +377,7 @@ export async function startCommand(): Promise<void> {
           endAt: new Date().toISOString(),
           exitCode: 1,
           containerId: container.id,
-          templateId: '',
+          templateId,
         });
       } catch (finalizeError) {
         console.error('Failed to finalize verse run:', finalizeError);
