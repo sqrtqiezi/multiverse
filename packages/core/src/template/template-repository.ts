@@ -23,4 +23,33 @@ export class TemplateRepository {
       throw error;
     }
   }
+
+  async findByName(name: string): Promise<Template | undefined> {
+    const all = await this.listAll();
+    return all.find((t) => t.name === name);
+  }
+
+  async listAll(): Promise<Template[]> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.templatesDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return [];
+      }
+      throw error;
+    }
+
+    const templates: Template[] = [];
+    for (const entry of entries) {
+      if (!entry.endsWith('.json')) continue;
+      const filePath = path.join(this.templatesDir, entry);
+      const raw = await fs.readFile(filePath, 'utf8');
+      templates.push(JSON.parse(raw) as Template);
+    }
+
+    return templates.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }
 }

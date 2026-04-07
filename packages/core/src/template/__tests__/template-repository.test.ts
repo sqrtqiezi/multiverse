@@ -52,4 +52,42 @@ describe('TemplateRepository', () => {
     const raw = await fs.readFile(filePath, 'utf8');
     expect(JSON.parse(raw)).toEqual(tpl);
   });
+
+  it('finds a template by name', async () => {
+    const tpl = createTestTemplate({ id: 'tpl-by-name', name: 'my-env' });
+    await repo.save(tpl);
+    const loaded = await repo.findByName('my-env');
+
+    expect(loaded).toEqual(tpl);
+  });
+
+  it('returns undefined when template name does not exist', async () => {
+    const result = await repo.findByName('nonexistent');
+    expect(result).toBeUndefined();
+  });
+
+  it('lists all templates sorted by createdAt descending', async () => {
+    const tpl1 = createTestTemplate({
+      id: 'tpl-1',
+      name: 'first',
+      createdAt: '2026-04-06T10:00:00.000Z',
+    });
+    const tpl2 = createTestTemplate({
+      id: 'tpl-2',
+      name: 'second',
+      createdAt: '2026-04-07T10:00:00.000Z',
+    });
+    await repo.save(tpl1);
+    await repo.save(tpl2);
+    const all = await repo.listAll();
+
+    expect(all).toHaveLength(2);
+    expect(all[0].id).toBe('tpl-2');
+    expect(all[1].id).toBe('tpl-1');
+  });
+
+  it('returns empty array when no templates exist', async () => {
+    const all = await repo.listAll();
+    expect(all).toEqual([]);
+  });
 });
