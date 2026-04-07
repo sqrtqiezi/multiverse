@@ -6,7 +6,13 @@ export interface RunRecord {
   containerId?: string;
 }
 
-export interface Verse {
+export interface VerseEnvironment {
+  hostPath: string;
+  containerPath: string;
+  initializedAt: string;
+}
+
+export interface PersistedVerseV1 {
   schemaVersion: 1;
   id: string;
   branch: string;
@@ -14,5 +20,18 @@ export interface Verse {
   updatedAt: string;
   runs: RunRecord[];
 }
+
+export interface Verse {
+  schemaVersion: 2;
+  id: string;
+  branch: string;
+  projectRoot: string;
+  environment: VerseEnvironment;
+  createdAt: string;
+  updatedAt: string;
+  runs: RunRecord[];
+}
+
+export type PersistedVerse = PersistedVerseV1 | Verse;
 
 export type ArchivedSegment = Record<string, never>;
