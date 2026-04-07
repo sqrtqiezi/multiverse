@@ -17,7 +17,6 @@ type CreateInput = {
 
 type ListInput = {
   templatesDir: string;
-  json?: boolean;
 };
 
 export function createTemplateHandler() {
@@ -27,7 +26,7 @@ export function createTemplateHandler() {
       return service.create({ name, homeDir, description });
     },
 
-    async list({ templatesDir, json }: ListInput): Promise<Template[]> {
+    async list({ templatesDir }: ListInput): Promise<Template[]> {
       const service = new TemplateService(templatesDir);
       return service.list();
     },
@@ -65,23 +64,28 @@ export function createTemplateCommand() {
     .option('--json', 'Output as JSON')
     .action(async (opts: { json?: boolean }) => {
       const templatesDir = getDefaultTemplatesDir();
-      const templates = await handler.list({ templatesDir, json: opts.json });
+      try {
+        const templates = await handler.list({ templatesDir });
 
-      if (opts.json) {
-        console.log(JSON.stringify(templates, null, 2));
-        return;
-      }
+        if (opts.json) {
+          console.log(JSON.stringify(templates, null, 2));
+          return;
+        }
 
-      if (templates.length === 0) {
-        console.log('No templates found. Create one with: multiverse template create <name>');
-        return;
-      }
+        if (templates.length === 0) {
+          console.log('No templates found. Create one with: multiverse template create <name>');
+          return;
+        }
 
-      console.log(`${'Name'.padEnd(30)} ${'ID'.padEnd(38)} ${'Created At'}`);
-      console.log('─'.repeat(80));
-      for (const tpl of templates) {
-        const created = new Date(tpl.createdAt).toLocaleString();
-        console.log(`${tpl.name.padEnd(30)} ${tpl.id.padEnd(38)} ${created}`);
+        console.log(`${'Name'.padEnd(30)} ${'ID'.padEnd(38)} ${'Created At'}`);
+        console.log('─'.repeat(80));
+        for (const tpl of templates) {
+          const created = new Date(tpl.createdAt).toLocaleString();
+          console.log(`${tpl.name.padEnd(30)} ${tpl.id.padEnd(38)} ${created}`);
+        }
+      } catch (error) {
+        console.error(`✗ ${(error as Error).message}`);
+        process.exit(1);
       }
     });
 
