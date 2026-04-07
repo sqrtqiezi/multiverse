@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import { request as httpsRequest } from 'node:https';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +154,27 @@ function getInteractiveTerminalEnv(): Record<string, string> {
   return env;
 }
 
+export async function syncCredentialFilesIntoVerseHome(
+  verseHomePath: string,
+  credentials: CredentialConfig,
+): Promise<void> {
+  for (const credentialFile of credentials.filePaths) {
+    const relativeTargetPath = path.relative('/home/coder', credentialFile.containerPath);
+
+    if (
+      relativeTargetPath.startsWith('..') ||
+      path.isAbsolute(relativeTargetPath) ||
+      relativeTargetPath.length === 0
+    ) {
+      continue;
+    }
+
+    const targetPath = path.join(verseHomePath, relativeTargetPath);
+    await fsPromises.mkdir(path.dirname(targetPath), { recursive: true });
+    await fsPromises.copyFile(credentialFile.hostPath, targetPath);
+  }
+}
+
 export function buildContainerConfig({
   cwd,
   imageTag,
@@ -172,16 +194,15 @@ export function buildContainerConfig({
     containerPath: verse.environment.containerPath,
     mode: 'rw' as const,
   };
-  const claudeHomeDir = path.dirname(verse.environment.containerPath);
 
   return {
     image: imageTag,
-    volumes: [workspaceMount, verseEnvironmentMount, ...credentials.filePaths],
+    volumes: [workspaceMount, verseEnvironmentMount],
     workDir: '/workspace',
     entrypoint: scriptedPrompt ? ['bash', '-lc', scriptedPrompt] : undefined,
     env: {
       ...credentials.envVars,
-      HOME: claudeHomeDir,
+      HOME: verse.environment.containerPath,
       ...(!isScriptedMode ? getInteractiveTerminalEnv() : {}),
     },
     user: getContainerUser(),
@@ -251,6 +272,8 @@ export async function startCommand(): Promise<void> {
   const verseService = new VerseService();
   const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
+
+  await syncCredentialFilesIntoVerseHome(verse.environment.hostPath, credentials);
 
   // Step 5: Create container config
   const config = buildContainerConfig({

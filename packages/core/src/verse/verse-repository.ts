@@ -34,6 +34,8 @@ export class VerseRepository {
       verse.branch = branch;
       await fs.mkdir(verse.environment.hostPath, { recursive: true });
       await fs.chmod(verse.environment.hostPath, 0o777);
+      await fs.mkdir(path.join(verse.environment.hostPath, '.claude'), { recursive: true });
+      await fs.chmod(path.join(verse.environment.hostPath, '.claude'), 0o777);
       await mutate(verse);
       verse.updatedAt = new Date().toISOString();
       await this.atomicWriteVerse(versePath, verse);

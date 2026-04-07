@@ -110,7 +110,7 @@ function getVerseEnvironmentStateRoot(repoRoot: string) {
 }
 
 function getVerseEnvironmentMarkerPath(hostPath: string) {
-  return path.join(hostPath, 'e2e-marker.txt');
+  return path.join(hostPath, '.claude', 'e2e-marker.txt');
 }
 
 async function pathExists(filePath: string) {

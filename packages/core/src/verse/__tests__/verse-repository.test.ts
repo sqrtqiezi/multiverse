@@ -59,6 +59,9 @@ describe('VerseRepository', () => {
     expect(verse.environment.initializedAt).toBeTypeOf('string');
     expect(verse.runs).toEqual([]);
     expect((await fs.stat(verse.environment.hostPath)).isDirectory()).toBe(true);
+    expect((await fs.stat(path.join(verse.environment.hostPath, '.claude'))).isDirectory()).toBe(
+      true,
+    );
   });
 
   it('creates a verse environment directory that is writable for the container user', async () => {
@@ -125,7 +128,7 @@ describe('VerseRepository', () => {
       branch,
       projectRoot: '/stale/project',
       environment: {
-        hostPath: '/stale/project/.multiverse/verse-envs/verse-2/claude-home',
+        hostPath: '/stale/project/.multiverse/verse-envs/verse-2/home',
         containerPath: CLAUDE_HOME_CONTAINER_PATH,
         initializedAt: '2026-04-02T00:00:00.000Z',
       },

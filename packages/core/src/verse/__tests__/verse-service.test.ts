@@ -35,7 +35,7 @@ describe('VerseService', () => {
       '.multiverse',
       'verse-envs',
       verse.id,
-      'claude-home',
+      'home',
     );
     const versesDir = path.join(tempDir, '.multiverse', 'verses');
     const files = await fs.readdir(versesDir);

@@ -61,7 +61,7 @@ export class CredentialResolver {
     for (const file of files) {
       if (CREDENTIAL_FILES.includes(file)) {
         const hostPath = path.join(this.claudeDir, file);
-        const containerPath = `${CLAUDE_HOME_CONTAINER_PATH}/${file}`;
+        const containerPath = `${CLAUDE_HOME_CONTAINER_PATH}/.claude/${file}`;
 
         credentialPaths.push({
           hostPath,
