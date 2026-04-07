@@ -435,12 +435,29 @@ Then('verse file for current branch should exist', async () => {
 Then('current branch verse should include environment metadata', async () => {
   const { verse, versePath } = await readCurrentVerse();
 
-  assert.strictEqual(verse.schemaVersion, 2, `Expected schemaVersion 2 in ${versePath}`);
+  assert.strictEqual(verse.schemaVersion, 3, `Expected schemaVersion 3 in ${versePath}`);
   assert.ok(verse.projectRoot, `Expected projectRoot in ${versePath}`);
   assert.ok(verse.environment, `Expected environment block in ${versePath}`);
   assert.ok(verse.environment.hostPath, `Expected environment.hostPath in ${versePath}`);
   assert.ok(verse.environment.containerPath, `Expected environment.containerPath in ${versePath}`);
   assert.ok(verse.environment.initializedAt, `Expected environment.initializedAt in ${versePath}`);
+});
+
+Then('current branch verse should have schema version {int}', async (version: number) => {
+  const { verse, versePath } = await readCurrentVerse();
+  assert.strictEqual(
+    verse.schemaVersion,
+    version,
+    `Expected schemaVersion ${version} in ${versePath}`,
+  );
+});
+
+Then('current branch verse should have a templateId', async () => {
+  const { verse, versePath } = await readCurrentVerse();
+  assert.ok(
+    (verse as { templateId?: string }).templateId,
+    `Expected templateId in ${versePath}`,
+  );
 });
 
 Then('current branch verse environment directory should exist', async () => {

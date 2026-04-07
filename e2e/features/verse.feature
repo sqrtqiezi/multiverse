@@ -44,3 +44,10 @@ Feature: Verse persistence for start runs
     Then the exit code should be 0
     And current branch verse should reuse the remembered environment path
     And current branch verse environment directory should contain the remembered marker
+
+  Scenario: Verse file uses schema v3 with templateId
+    Given verse file for current branch should not exist
+    When I run "multiverse start"
+    Then the exit code should be 0
+    And current branch verse should have schema version 3
+    And current branch verse should have a templateId
