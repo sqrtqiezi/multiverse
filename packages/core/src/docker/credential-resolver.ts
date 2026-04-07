@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { CredentialConfig, CredentialPath } from '@multiverse/types';
+import { CLAUDE_HOME_CONTAINER_PATH } from '../verse/claude-home.js';
 
 const CREDENTIAL_FILES = ['credentials.json', '.credentials'];
 export const ORIGINAL_ANTHROPIC_BASE_URL_ENV = 'MULTIVERSE_ORIGINAL_ANTHROPIC_BASE_URL';
@@ -60,7 +61,7 @@ export class CredentialResolver {
     for (const file of files) {
       if (CREDENTIAL_FILES.includes(file)) {
         const hostPath = path.join(this.claudeDir, file);
-        const containerPath = `/home/coder/.claude/${file}`;
+        const containerPath = `${CLAUDE_HOME_CONTAINER_PATH}/${file}`;
 
         credentialPaths.push({
           hostPath,

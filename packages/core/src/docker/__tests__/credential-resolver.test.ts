@@ -43,7 +43,7 @@ describe('CredentialResolver', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].hostPath).toContain('credentials.json');
-    expect(result[0].containerPath).toBe('/home/coder/.claude/credentials.json');
+    expect(result[0].containerPath).toBe('/home/node/.claude/credentials.json');
     expect(result[0].mode).toBe('ro');
   });
 

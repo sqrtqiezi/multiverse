@@ -5,19 +5,21 @@ import type { DockerClient } from './docker-client.js';
 export class ContainerManager {
   constructor(private dockerClient: DockerClient) {}
 
-  async createAndStart(config: ContainerConfig): Promise<Container> {
+  async create(config: ContainerConfig): Promise<Container> {
     const docker = this.dockerClient.getDocker();
+    const tty = config.tty ?? true;
 
     const binds = config.volumes.map((v) => `${v.hostPath}:${v.containerPath}:${v.mode}`);
 
-    const container = await docker.createContainer({
+    return await docker.createContainer({
       Image: config.image,
+      User: config.user,
       WorkingDir: config.workDir,
       Entrypoint: config.entrypoint,
       Env: config.env ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`) : undefined,
-      Tty: true,
-      OpenStdin: true,
-      AttachStdin: true,
+      Tty: tty,
+      OpenStdin: tty,
+      AttachStdin: tty,
       AttachStdout: true,
       AttachStderr: true,
       HostConfig: {
@@ -26,9 +28,25 @@ export class ContainerManager {
         AutoRemove: config.autoRemove ?? true,
       },
     });
+  }
 
+  async start(container: Container): Promise<void> {
     await container.start();
+  }
+
+  async createAndStart(config: ContainerConfig): Promise<Container> {
+    const container = await this.create(config);
+    await this.start(container);
     return container;
+  }
+
+  async logs(container: Container): Promise<string> {
+    const output = await container.logs({
+      stdout: true,
+      stderr: true,
+    });
+
+    return output.toString('utf8');
   }
 
   async attach(container: Container): Promise<void> {
@@ -49,18 +67,20 @@ export class ContainerManager {
       process.stdin.setRawMode(true);
     }
 
+    const resizeHandler = async () => {
+      try {
+        await container.resize({
+          h: process.stdout.rows || 24,
+          w: process.stdout.columns || 80,
+        });
+      } catch (err) {
+        // Ignore resize errors (container might be stopped)
+      }
+    };
+
     // Handle terminal resize
     if (process.stdout.isTTY) {
-      const resizeHandler = async () => {
-        try {
-          await container.resize({
-            h: process.stdout.rows || 24,
-            w: process.stdout.columns || 80,
-          });
-        } catch (err) {
-          // Ignore resize errors (container might be stopped)
-        }
-      };
+      await resizeHandler();
       process.stdout.on('resize', resizeHandler);
     }
 

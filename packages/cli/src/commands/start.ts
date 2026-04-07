@@ -15,7 +15,7 @@ import {
   PreflightChecker,
   VerseService,
 } from '@multiverse/core';
-import type { ContainerConfig } from '@multiverse/types';
+import type { ContainerConfig, CredentialConfig, Verse } from '@multiverse/types';
 import type { Container } from 'dockerode';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -120,6 +120,77 @@ async function startAnthropicBaseUrlProxy(
   };
 }
 
+type BuildContainerConfigInput = {
+  cwd: string;
+  imageTag: string;
+  scriptedPrompt?: string;
+  verse: Verse;
+  credentials: CredentialConfig;
+  extraHosts?: string[];
+};
+
+function getContainerUser(): string | undefined {
+  if (typeof process.getuid !== 'function' || typeof process.getgid !== 'function') {
+    return undefined;
+  }
+
+  return `${process.getuid()}:${process.getgid()}`;
+}
+
+function getInteractiveTerminalEnv(): Record<string, string> {
+  const term = process.env.TERM && process.env.TERM !== 'dumb'
+    ? process.env.TERM
+    : 'xterm-256color';
+  const env: Record<string, string> = { TERM: term };
+
+  if (process.env.COLORTERM) {
+    env.COLORTERM = process.env.COLORTERM;
+  }
+  if (process.env.LANG) {
+    env.LANG = process.env.LANG;
+  }
+
+  return env;
+}
+
+export function buildContainerConfig({
+  cwd,
+  imageTag,
+  scriptedPrompt,
+  verse,
+  credentials,
+  extraHosts,
+}: BuildContainerConfigInput): ContainerConfig {
+  const isScriptedMode = Boolean(scriptedPrompt);
+  const workspaceMount = {
+    hostPath: cwd,
+    containerPath: '/workspace',
+    mode: 'rw' as const,
+  };
+  const verseEnvironmentMount = {
+    hostPath: verse.environment.hostPath,
+    containerPath: verse.environment.containerPath,
+    mode: 'rw' as const,
+  };
+  const claudeHomeDir = path.dirname(verse.environment.containerPath);
+
+  return {
+    image: imageTag,
+    volumes: [workspaceMount, verseEnvironmentMount, ...credentials.filePaths],
+    workDir: '/workspace',
+    entrypoint: scriptedPrompt ? ['bash', '-lc', scriptedPrompt] : undefined,
+    env: {
+      ...credentials.envVars,
+      HOME: claudeHomeDir,
+      ...(!isScriptedMode ? getInteractiveTerminalEnv() : {}),
+    },
+    user: getContainerUser(),
+    tty: !isScriptedMode,
+    extraHosts,
+    autoRemove: !isScriptedMode,
+  };
+}
+
 export async function startCommand(): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
   const scriptedPrompt = process.env.MULTIVERSE_CLAUDE_PRINT_PROMPT?.trim();
@@ -182,24 +253,17 @@ export async function startCommand(): Promise<void> {
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
   // Step 5: Create container config
-  const workspaceMount = {
-    hostPath: process.cwd(),
-    containerPath: '/workspace',
-    mode: 'rw' as const,
-  };
-
-  const config: ContainerConfig = {
-    image: imageTag,
-    volumes: [workspaceMount, ...credentials.filePaths],
-    workDir: '/workspace',
-    entrypoint: scriptedPrompt ? ['claude', '--bare', '-p', scriptedPrompt] : undefined,
-    env: credentials.envVars,
+  const config = buildContainerConfig({
+    cwd: process.cwd(),
+    imageTag,
+    scriptedPrompt,
+    verse,
+    credentials,
     extraHosts:
       process.platform === 'linux' && usesHostDockerInternal(credentials.envVars.ANTHROPIC_BASE_URL)
         ? ['host.docker.internal:host-gateway']
         : undefined,
-    autoRemove: true,
-  };
+  });
 
   // Step 6: Create and start container
   const containerManager = new ContainerManager(dockerClient);
@@ -210,27 +274,51 @@ export async function startCommand(): Promise<void> {
   const runId = randomUUID();
   const startedAt = new Date().toISOString();
   try {
-    container = await containerManager.createAndStart(config);
-    await verseService.appendRunStart({
-      cwd: process.cwd(),
-      runId,
-      startAt: startedAt,
-    });
-    runStarted = true;
-    console.log('✓ Container started\n');
     if (scriptedPrompt) {
+      container = await containerManager.createAndStart(config);
+      console.log('✓ Container started\n');
       console.log('Running claude-code scripted prompt mode...\n');
+      console.log('─'.repeat(50));
+      console.log();
     } else {
-      console.log('Entering claude-code interactive mode...\n');
+      container = await containerManager.createAndStart(config);
+      await verseService.appendRunStart({
+        cwd: process.cwd(),
+        runId,
+        startAt: startedAt,
+      });
+      runStarted = true;
+      console.log('✓ Container started\n');
+      console.log('Preparing claude-code interactive mode...\n');
+      console.log('─'.repeat(50));
+      console.log();
+      await containerManager.attach(container);
     }
-    console.log('─'.repeat(50));
-    console.log();
+    if (scriptedPrompt) {
+      await verseService.appendRunStart({
+        cwd: process.cwd(),
+        runId,
+        startAt: startedAt,
+      });
+      runStarted = true;
+    }
 
-    // Step 7: Attach to container
-    await containerManager.attach(container);
+    let exitCode: number;
+    if (scriptedPrompt) {
+      exitCode = await containerManager.waitForExit(container);
+      const logs = await containerManager.logs(container);
 
-    // Step 8: Wait for exit
-    const exitCode = await containerManager.waitForExit(container);
+      if (logs.length > 0) {
+        process.stdout.write(logs);
+        if (!logs.endsWith('\n')) {
+          process.stdout.write('\n');
+        }
+      }
+    } else {
+      // Step 7: Wait for exit
+      exitCode = await containerManager.waitForExit(container);
+    }
+
     await verseService.finalizeRun({
       cwd: process.cwd(),
       runId,
@@ -243,6 +331,9 @@ export async function startCommand(): Promise<void> {
     console.log();
     console.log('─'.repeat(50));
     console.log(`\n✓ Container exited with code ${exitCode}`);
+    if (scriptedPrompt) {
+      await containerManager.remove(container);
+    }
     await closeAnthropicBaseUrlProxy(anthropicBaseUrlProxy);
 
     process.exit(exitCode);

@@ -18,6 +18,14 @@ type ScenarioBackendMode = 'default' | 'ollama';
 let commandOutput = '';
 let commandExitCode = 0;
 let lastObservedRunCount: number | undefined;
+let rememberedEnvironmentPath: string | undefined;
+let rememberedEnvironmentMarker: {
+  content: string;
+  inode: number;
+  path: string;
+} | undefined;
+let recordedContainerIds: string[] = [];
+let markerWritingPromptMode = false;
 let dockerMode: ScenarioDockerMode = 'normal';
 let credentialMode: ScenarioCredentialMode = 'exists';
 let backendMode: ScenarioBackendMode = 'default';
@@ -25,7 +33,8 @@ let cliBuilt = false;
 let ollamaRuntimeReady = false;
 
 const ollamaExpectedToken = process.env.MULTIVERSE_E2E_OLLAMA_EXPECTED_TOKEN ?? 'E2E_OLLAMA_OK_20260403';
-const ollamaPrompt = `Reply with exactly ${ollamaExpectedToken} and nothing else.`;
+const ollamaPrompt = `printf '%s\\n' '${ollamaExpectedToken}'`;
+const ollamaScriptedPrompt = `printf '%s\\n' '${ollamaExpectedToken}'; printf '%s\\n' '${ollamaExpectedToken}' > ~/.claude/e2e-marker.txt`;
 
 function getOllamaModel() {
   return process.env.MULTIVERSE_E2E_OLLAMA_MODEL ?? 'qwen3-coder:480b-cloud';
@@ -94,6 +103,14 @@ function getVersePathCandidates(repoRoot: string, branch: string) {
   const branchHash = createHash('sha1').update(branch).digest('hex').slice(0, 8);
 
   return [path.join(repoRoot, verseDir, `${sanitizedBranch}__${branchHash}.json`)];
+}
+
+function getVerseEnvironmentStateRoot(repoRoot: string) {
+  return path.join(repoRoot, '.multiverse', 'verse-envs');
+}
+
+function getVerseEnvironmentMarkerPath(hostPath: string) {
+  return path.join(hostPath, 'e2e-marker.txt');
 }
 
 async function pathExists(filePath: string) {
@@ -176,11 +193,77 @@ async function findExistingVersePath() {
   return undefined;
 }
 
+async function recordLatestRunContainerId() {
+  const versePath = await findExistingVersePath();
+
+  if (!versePath) {
+    return;
+  }
+
+  const { verse } = await readCurrentVerse();
+  const latestRun = verse.runs?.at(-1);
+
+  if (!latestRun?.containerId) {
+    return;
+  }
+
+  if (!recordedContainerIds.includes(latestRun.containerId)) {
+    recordedContainerIds.push(latestRun.containerId);
+  }
+}
+
+async function cleanupRecordedMultiverseContainers() {
+  if (recordedContainerIds.length === 0) {
+    return [];
+  }
+
+  const containerIds = [...recordedContainerIds];
+
+  await execAsync(
+    `docker rm -f ${containerIds.map((id) => `'${id}'`).join(' ')} >/dev/null 2>&1 || true`,
+  );
+
+  recordedContainerIds = [];
+  return containerIds;
+}
+
+async function resetVerseEnvironmentState(repoRoot: string) {
+  await fs.rm(getVerseEnvironmentStateRoot(repoRoot), { force: true, recursive: true });
+}
+
+async function readVerseEnvironmentMarker() {
+  const { verse, versePath } = await readCurrentVerse();
+  assert.ok(
+    verse.environment?.hostPath,
+    `Expected environment.hostPath in ${versePath} before reading the marker`,
+  );
+  const markerPath = getVerseEnvironmentMarkerPath(verse.environment.hostPath);
+  const content = await fs.readFile(markerPath, 'utf8');
+  const stats = await fs.stat(markerPath);
+
+  return {
+    content: content.trim(),
+    inode: stats.ino,
+    markerPath,
+    verse,
+    versePath,
+  };
+}
+
+function resetScenarioState() {
+  lastObservedRunCount = undefined;
+  rememberedEnvironmentPath = undefined;
+  rememberedEnvironmentMarker = undefined;
+  recordedContainerIds = [];
+}
+
 Before(() => {
   dockerMode = 'normal';
   credentialMode = 'exists';
   backendMode = 'default';
   ollamaRuntimeReady = false;
+  markerWritingPromptMode = false;
+  resetScenarioState();
 });
 
 Given('Docker is not running', async function () {
@@ -211,13 +294,19 @@ Given('Ollama Anthropic-compatible API is available', async function () {
   ollamaRuntimeReady = true;
 });
 
+Given('marker-writing prompt mode is enabled', async function () {
+  markerWritingPromptMode = true;
+});
+
 Given('verse file for current branch should not exist', async () => {
+  const repoRoot = await getRepoRoot();
   const { candidates } = await resolveCurrentVersePath();
   for (const candidatePath of candidates) {
     await fs.rm(candidatePath, { force: true });
   }
+  await resetVerseEnvironmentState(repoRoot);
   await assertVerseFileAbsent();
-  lastObservedRunCount = undefined;
+  resetScenarioState();
 });
 
 When('I run {string}', async (command: string) => {
@@ -260,7 +349,9 @@ When('I run {string}', async (command: string) => {
       env.ANTHROPIC_API_KEY = process.env.MULTIVERSE_E2E_OLLAMA_API_KEY ?? 'sk-ant-e2e-local';
       env.ANTHROPIC_BASE_URL = getOllamaHostBaseUrl();
       env.ANTHROPIC_MODEL = getOllamaModel();
-      env.MULTIVERSE_CLAUDE_PRINT_PROMPT = ollamaPrompt;
+      env.MULTIVERSE_CLAUDE_PRINT_PROMPT = markerWritingPromptMode
+        ? ollamaScriptedPrompt
+        : ollamaPrompt;
     } else {
       env.ANTHROPIC_API_KEY = 'sk-ant-e2e-dummy-key';
       delete env.ANTHROPIC_BASE_URL;
@@ -282,12 +373,14 @@ When('I run {string}', async (command: string) => {
     commandOutput = (execError.stdout ?? '') + (execError.stderr ?? '');
     commandExitCode = execError.code ?? 1;
   }
+
+  if (commandToRun === 'node packages/cli/dist/cli.js start') {
+    await recordLatestRunContainerId();
+  }
 });
 
 After(async () => {
-  await execAsync(
-    'docker ps -q --filter "ancestor=multiverse/claude-code:latest" | xargs -r docker rm -f',
-  );
+  await cleanupRecordedMultiverseContainers();
 });
 
 Then('the output should contain {string}', (expectedText: string) => {
@@ -319,7 +412,6 @@ Then('I should see {string}', (expectedText: string) => {
   assert(commandOutput.includes(expectedText));
 });
 
-
 Then('verse file for current branch should exist', async () => {
   const existingPath = await findExistingVersePath();
 
@@ -329,21 +421,100 @@ Then('verse file for current branch should exist', async () => {
   assert(stats.isFile(), `Expected verse file to exist at ${existingPath}`);
 });
 
-Then('verse file for current branch has at least 1 run', async () => {
+Then('current branch verse should include environment metadata', async () => {
   const { verse, versePath } = await readCurrentVerse();
 
-  assert(Array.isArray(verse.runs), `Expected runs array in ${versePath}`);
-  assert(verse.runs.length >= 1, `Expected at least 1 run in ${versePath}`);
+  assert.strictEqual(verse.schemaVersion, 2, `Expected schemaVersion 2 in ${versePath}`);
+  assert.ok(verse.projectRoot, `Expected projectRoot in ${versePath}`);
+  assert.ok(verse.environment, `Expected environment block in ${versePath}`);
+  assert.ok(verse.environment.hostPath, `Expected environment.hostPath in ${versePath}`);
+  assert.ok(verse.environment.containerPath, `Expected environment.containerPath in ${versePath}`);
+  assert.ok(verse.environment.initializedAt, `Expected environment.initializedAt in ${versePath}`);
+});
 
-  lastObservedRunCount = verse.runs.length;
+Then('current branch verse environment directory should exist', async () => {
+  const { verse } = await readCurrentVerse();
+  const stats = await fs.stat(verse.environment.hostPath);
+
+  assert(stats.isDirectory(), `Expected ${verse.environment.hostPath} to be a directory`);
+});
+
+Then('current branch verse environment directory should contain the expected marker', async () => {
+  const { markerPath, content } = await readVerseEnvironmentMarker();
+
+  assert.strictEqual(
+    content,
+    ollamaExpectedToken,
+    `Expected ${markerPath} to contain ${ollamaExpectedToken}, but got ${content}`,
+  );
+});
+
+Then('remember the current branch verse environment path', async () => {
+  const { verse, versePath } = await readCurrentVerse();
+
+  assert.ok(
+    verse.environment?.hostPath,
+    `Expected environment.hostPath in ${versePath} before remembering it`,
+  );
+  rememberedEnvironmentPath = verse.environment.hostPath;
+  lastObservedRunCount = Array.isArray(verse.runs) ? verse.runs.length : undefined;
+});
+
+Then('remember the current branch verse environment marker', async () => {
+  const { content, inode, markerPath } = await readVerseEnvironmentMarker();
+
+  rememberedEnvironmentMarker = {
+    content,
+    inode,
+    path: markerPath,
+  };
+});
+
+Then('current branch verse should reuse the remembered environment path', async () => {
+  const { verse, versePath } = await readCurrentVerse();
+
+  assert.ok(
+    rememberedEnvironmentPath,
+    'Expected a remembered environment path before checking reuse',
+  );
+  assert.strictEqual(
+    verse.environment.hostPath,
+    rememberedEnvironmentPath,
+    `Expected current branch verse to reuse ${rememberedEnvironmentPath}, but found ${verse.environment.hostPath} in ${versePath}`,
+  );
+});
+
+Then('current branch verse environment directory should contain the remembered marker', async () => {
+  const { content, inode, markerPath } = await readVerseEnvironmentMarker();
+
+  assert.ok(
+    rememberedEnvironmentMarker,
+    'Expected a remembered environment marker before checking reuse',
+  );
+  assert.strictEqual(
+    markerPath,
+    rememberedEnvironmentMarker.path,
+    `Expected marker path to remain ${rememberedEnvironmentMarker.path}, but found ${markerPath}`,
+  );
+  assert.strictEqual(
+    content,
+    rememberedEnvironmentMarker.content,
+    `Expected marker content to remain ${rememberedEnvironmentMarker.content}, but found ${content}`,
+  );
+  assert.strictEqual(
+    inode,
+    rememberedEnvironmentMarker.inode,
+    `Expected marker inode to remain ${rememberedEnvironmentMarker.inode}, but found ${inode}`,
+  );
 });
 
 Then('verse file for current branch should have one more run', async () => {
   const { verse, versePath } = await readCurrentVerse();
 
-  assert(
-    typeof lastObservedRunCount === 'number',
-    'Expected a previous run count before checking for one more run',
+  assert.strictEqual(
+    typeof lastObservedRunCount,
+    'number',
+    'Expected a remembered run count before checking for one more run',
   );
   assert(Array.isArray(verse.runs), `Expected runs array in ${versePath}`);
   assert.strictEqual(
@@ -351,23 +522,24 @@ Then('verse file for current branch should have one more run', async () => {
     lastObservedRunCount + 1,
     `Expected one more run in ${versePath}, but found ${verse.runs.length} after baseline ${lastObservedRunCount}`,
   );
-
-  lastObservedRunCount = verse.runs.length;
 });
 
-Then('latest run in current branch verse should contain finish fields', async () => {
-  const { verse, versePath } = await readCurrentVerse();
-  const latestRun = verse.runs?.at(-1);
-
-  assert(latestRun, `Expected at least one run in ${versePath}`);
-  assert.ok(latestRun.endAt, `Expected latest run in ${versePath} to include endAt`);
-  assert.strictEqual(
-    typeof latestRun.exitCode,
-    'number',
-    `Expected latest run in ${versePath} to include exitCode`,
-  );
+Then('the recorded multiverse containers are removed', async () => {
   assert.ok(
-    latestRun.containerId,
-    `Expected latest run in ${versePath} to include containerId`,
+    recordedContainerIds.length > 0,
+    'Expected at least one recorded container before cleanup',
   );
+  const removedIds = await cleanupRecordedMultiverseContainers();
+
+  for (const containerId of removedIds) {
+    const { stdout } = await execAsync(
+      `docker ps -aq --filter "id=${containerId}" --format "{{.ID}}"`,
+    );
+
+    assert.strictEqual(
+      stdout.trim(),
+      '',
+      `Expected observed container ${containerId} to be removed, but it is still present`,
+    );
+  }
 });

@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { CLAUDE_HOME_CONTAINER_PATH } from '../claude-home.js';
 import { VerseService } from '../verse-service.js';
 
 const execFileAsync = promisify(execFile);
@@ -25,22 +26,63 @@ describe('VerseService', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('creates a verse on first ensure', async () => {
+  it('returns schema v2 environment metadata when ensuring a verse for the current branch', async () => {
     const service = new VerseService();
 
     const verse = await service.ensureVerseForCurrentBranch(tempDir);
+    const expectedHostPath = path.join(
+      tempDir,
+      '.multiverse',
+      'verse-envs',
+      verse.id,
+      'claude-home',
+    );
     const versesDir = path.join(tempDir, '.multiverse', 'verses');
     const files = await fs.readdir(versesDir);
 
-    expect(verse.schemaVersion).toBe(1);
+    expect(verse.schemaVersion).toBe(2);
+    expect(verse.projectRoot).toBe(tempDir);
+    expect(verse.environment.hostPath).toBe(expectedHostPath);
+    expect(verse.environment.containerPath).toBe(CLAUDE_HOME_CONTAINER_PATH);
+    expect(verse.environment.initializedAt).toBeTypeOf('string');
     expect(verse.runs).toEqual([]);
     expect(verse.createdAt).toBeTypeOf('string');
     expect(verse.updatedAt).toBeTypeOf('string');
     expect(files.length).toBeGreaterThan(0);
+    expect((await fs.stat(verse.environment.hostPath)).isDirectory()).toBe(true);
   });
 
-  it('appends a run start and then finalizes it by runId', async () => {
+  it('reuses the same verse environment path on repeated ensure calls', async () => {
     const service = new VerseService();
+
+    const first = await service.ensureVerseForCurrentBranch(tempDir);
+    const second = await service.ensureVerseForCurrentBranch(tempDir);
+
+    expect(second.id).toBe(first.id);
+    expect(second.branch).toBe(first.branch);
+    expect(second.environment.hostPath).toBe(first.environment.hostPath);
+    expect(second.environment.initializedAt).toBe(first.environment.initializedAt);
+  });
+
+  it('keeps detached HEAD handling compatible with verse ensure', async () => {
+    await execFileAsync('git', ['checkout', '--detach'], { cwd: tempDir });
+
+    const service = new VerseService();
+    const verse = await service.ensureVerseForCurrentBranch(tempDir);
+
+    expect(verse.schemaVersion).toBe(2);
+    expect(verse.branch).toMatch(/^detached-/);
+    expect(verse.environment.hostPath).toContain(
+      path.join('.multiverse', 'verse-envs'),
+    );
+  });
+
+  it('appends a run start and then finalizes it by runId on schema v2 verses', async () => {
+    const service = new VerseService();
+
+    const ensured = await service.ensureVerseForCurrentBranch(tempDir);
+
+    expect(ensured.schemaVersion).toBe(2);
 
     await service.appendRunStart({
       cwd: tempDir,
@@ -54,6 +96,7 @@ describe('VerseService', () => {
     });
 
     expect(started.runs).toHaveLength(2);
+    expect(started.schemaVersion).toBe(2);
     expect(started.runs[0]).toMatchObject({
       runId: 'run-1',
       startAt: '2026-04-02T00:00:00.000Z',
@@ -72,6 +115,7 @@ describe('VerseService', () => {
     });
 
     expect(finalized.runs).toHaveLength(2);
+    expect(finalized.schemaVersion).toBe(2);
     expect(finalized.runs.find((run) => run.runId === 'run-1')).toMatchObject({
       runId: 'run-1',
       startAt: '2026-04-02T00:00:00.000Z',
