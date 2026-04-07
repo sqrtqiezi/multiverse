@@ -48,9 +48,9 @@ describe('TemplateService', () => {
   it('rejects duplicate template name', async () => {
     await service.create({ name: 'dup-name', homeDir: tempHome });
 
-    await expect(
-      service.create({ name: 'dup-name', homeDir: tempHome }),
-    ).rejects.toThrow(/already exists/);
+    await expect(service.create({ name: 'dup-name', homeDir: tempHome })).rejects.toThrow(
+      /already exists/,
+    );
   });
 
   it('lists all templates', async () => {

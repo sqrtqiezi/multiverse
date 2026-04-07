@@ -70,10 +70,10 @@ Given('I have created a template named {string}', async (name: string) => {
 
   const env = { ...process.env, HOME: home } as NodeJS.ProcessEnv;
 
-  const result = await execAsync(
-    `node packages/cli/dist/cli.js template create ${name}`,
-    { cwd: repoRoot, env },
-  ).catch((err: unknown) => {
+  const result = await execAsync(`node packages/cli/dist/cli.js template create ${name}`, {
+    cwd: repoRoot,
+    env,
+  }).catch((err: unknown) => {
     const e = err as { stdout?: string; stderr?: string; code?: number };
     throw new Error(
       `Failed to create template "${name}" (exit code ${e.code}): ${(e.stdout ?? '') + (e.stderr ?? '')}`,

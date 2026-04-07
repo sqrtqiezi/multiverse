@@ -24,10 +24,7 @@ export async function createConfigSnapshot(homeDir: string): Promise<ConfigSnaps
   return { claudeMd, files };
 }
 
-async function readDirRecursive(
-  currentDir: string,
-  baseDir: string,
-): Promise<SnapshotFile[]> {
+async function readDirRecursive(currentDir: string, baseDir: string): Promise<SnapshotFile[]> {
   const entries = await fs.readdir(currentDir, { withFileTypes: true });
   const files: SnapshotFile[] = [];
 

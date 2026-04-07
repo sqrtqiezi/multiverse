@@ -454,10 +454,7 @@ Then('current branch verse should have schema version {int}', async (version: nu
 
 Then('current branch verse should have a templateId', async () => {
   const { verse, versePath } = await readCurrentVerse();
-  assert.ok(
-    (verse as { templateId?: string }).templateId,
-    `Expected templateId in ${versePath}`,
-  );
+  assert.ok((verse as { templateId?: string }).templateId, `Expected templateId in ${versePath}`);
 });
 
 Then('current branch verse environment directory should exist', async () => {
