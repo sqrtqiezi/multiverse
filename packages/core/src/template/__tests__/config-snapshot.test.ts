@@ -41,7 +41,7 @@ describe('createConfigSnapshot', () => {
 
     expect(snapshot.files).toHaveLength(1);
     expect(snapshot.files[0].path).toBe('settings.json');
-    expect(snapshot.files[0].content).toBe('{"key": "value"}');
+    expect(snapshot.files[0].content).toBe('{\n  "key": "value"\n}');
   });
 
   it('captures nested files with relative paths', async () => {
@@ -211,6 +211,40 @@ describe('createConfigSnapshot', () => {
 
     const paths = snapshot.files.map((f) => f.path);
     expect(paths).toEqual(['settings.json']);
+  });
+
+  it('removes hooks from settings.json during snapshot', async () => {
+    const claudeDir = path.join(tempHome, '.claude');
+    await fs.mkdir(claudeDir, { recursive: true });
+    const settings = {
+      hooks: {
+        PreToolUse: [{ matcher: '', hooks: [{ type: 'command', command: '/usr/local/bin/hook.sh' }] }],
+      },
+      enabledPlugins: { 'superpowers@marketplace': true },
+      model: 'opus',
+    };
+    await fs.writeFile(path.join(claudeDir, 'settings.json'), JSON.stringify(settings));
+
+    const snapshot = await createConfigSnapshot(tempHome);
+
+    const settingsFile = snapshot.files.find((f) => f.path === 'settings.json');
+    expect(settingsFile).toBeDefined();
+    const parsed = JSON.parse(settingsFile!.content);
+    expect(parsed.hooks).toBeUndefined();
+    expect(parsed.enabledPlugins).toEqual({ 'superpowers@marketplace': true });
+    expect(parsed.model).toBe('opus');
+  });
+
+  it('leaves settings.json unchanged if not valid JSON', async () => {
+    const claudeDir = path.join(tempHome, '.claude');
+    await fs.mkdir(claudeDir, { recursive: true });
+    await fs.writeFile(path.join(claudeDir, 'settings.json'), 'not json');
+
+    const snapshot = await createConfigSnapshot(tempHome);
+
+    const settingsFile = snapshot.files.find((f) => f.path === 'settings.json');
+    expect(settingsFile).toBeDefined();
+    expect(settingsFile!.content).toBe('not json');
   });
 
   it('skips directories with permission errors instead of throwing', async () => {

@@ -51,6 +51,16 @@ function isExcludedFile(relativePath: string): boolean {
   return false;
 }
 
+function sanitizeSettings(content: string): string {
+  try {
+    const settings = JSON.parse(content);
+    delete settings.hooks;
+    return JSON.stringify(settings, null, 2);
+  } catch {
+    return content;
+  }
+}
+
 export async function createConfigSnapshot(homeDir: string): Promise<ConfigSnapshot> {
   const claudeDir = path.join(homeDir, '.claude');
 
@@ -100,7 +110,10 @@ async function readDirRecursive(currentDir: string, baseDir: string): Promise<Sn
         continue;
       }
       try {
-        const content = await fs.readFile(fullPath, 'utf8');
+        let content = await fs.readFile(fullPath, 'utf8');
+        if (relativePath === 'settings.json') {
+          content = sanitizeSettings(content);
+        }
         files.push({ path: relativePath, content });
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EACCES') {
