@@ -139,7 +139,7 @@ describe('createConfigSnapshot', () => {
     );
   });
 
-  it('excludes plugins/marketplaces directory', async () => {
+  it('includes plugins/marketplaces files but excludes .git within', async () => {
     const claudeDir = path.join(tempHome, '.claude');
     const marketplacesDir = path.join(
       claudeDir,
@@ -147,7 +147,9 @@ describe('createConfigSnapshot', () => {
       'marketplaces',
       'some-marketplace',
     );
-    await fs.mkdir(marketplacesDir, { recursive: true });
+    const gitDir = path.join(marketplacesDir, '.git');
+    await fs.mkdir(gitDir, { recursive: true });
+    await fs.writeFile(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main');
     await fs.writeFile(
       path.join(marketplacesDir, 'marketplace.json'),
       '{"name": "test"}',
@@ -156,8 +158,11 @@ describe('createConfigSnapshot', () => {
     const snapshot = await createConfigSnapshot(tempHome);
 
     const paths = snapshot.files.map((f) => f.path);
-    expect(paths).not.toContain(
+    expect(paths).toContain(
       'plugins/marketplaces/some-marketplace/marketplace.json',
+    );
+    expect(paths).not.toContain(
+      'plugins/marketplaces/some-marketplace/.git/HEAD',
     );
   });
 

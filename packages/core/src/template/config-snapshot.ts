@@ -20,7 +20,6 @@ const EXCLUDED_DIRS = new Set([
   'sessions',
   'plans',
   'cache',
-  'plugins/marketplaces',
   'plugins/data',
 ]);
 
