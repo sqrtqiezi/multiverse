@@ -20,6 +20,13 @@ export type { AppError, ErrorTemplate, FormattedError } from './error-handler/ty
 export { BranchResolver } from './git/branch-resolver.js';
 // Export preflight checks
 export { PreflightChecker } from './preflight/index.js';
+// Export template modules
+export { createConfigSnapshot } from './template/config-snapshot.js';
+export { injectTemplateSnapshot } from './template/template-injector.js';
+export { TemplateRepository } from './template/template-repository.js';
+export { TemplateService } from './template/template-service.js';
+export type { ValidationResult } from './template/template-validator.js';
+export { TemplateValidator } from './template/template-validator.js';
 export { CLAUDE_HOME_CONTAINER_PATH } from './verse/claude-home.js';
 export {
   getVersePath,

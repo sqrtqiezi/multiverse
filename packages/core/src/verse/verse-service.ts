@@ -9,6 +9,7 @@ type AppendRunStartInput = {
   cwd: string;
   runId: string;
   startAt: string;
+  templateId: string;
 };
 
 type FinalizeRunInput = {
@@ -17,26 +18,29 @@ type FinalizeRunInput = {
   endAt: string;
   exitCode: number;
   containerId: string;
+  templateId: string;
 };
 
 export class VerseService {
   constructor(private readonly branchResolver = new BranchResolver()) {}
 
-  async ensureVerseForCurrentBranch(cwd: string): Promise<Verse> {
+  async ensureVerseForCurrentBranch(cwd: string, templateId: string): Promise<Verse> {
     const branch = await this.branchResolver.getCurrentBranch(cwd);
     const repository = new VerseRepository(cwd);
     return await repository.writeVerse({
       branch,
+      templateId,
       mutate: () => undefined,
     });
   }
 
-  async appendRunStart({ cwd, runId, startAt }: AppendRunStartInput): Promise<Verse> {
+  async appendRunStart({ cwd, runId, startAt, templateId }: AppendRunStartInput): Promise<Verse> {
     const branch = await this.branchResolver.getCurrentBranch(cwd);
     const repository = new VerseRepository(cwd);
 
     return await repository.writeVerse({
       branch,
+      templateId,
       mutate: (verse) => {
         verse.runs.push({
           runId,
@@ -52,6 +56,7 @@ export class VerseService {
     endAt,
     exitCode,
     containerId,
+    templateId,
   }: FinalizeRunInput): Promise<Verse> {
     const branch = await this.branchResolver.getCurrentBranch(cwd);
     const versePath = getVersePath(cwd, branch);
@@ -65,6 +70,7 @@ export class VerseService {
     const repository = new VerseRepository(cwd);
     return await repository.writeVerse({
       branch,
+      templateId,
       mutate: (verse) => {
         const run = verse.runs.find((entry) => entry.runId === runId);
 

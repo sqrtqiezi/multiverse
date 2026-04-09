@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import { request as httpsRequest } from 'node:https';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppError } from '@multiverse/core';
@@ -15,7 +16,9 @@ import {
   ImageBuilder,
   ORIGINAL_ANTHROPIC_BASE_URL_ENV,
   PreflightChecker,
+  TemplateService,
   VerseService,
+  injectTemplateSnapshot,
 } from '@multiverse/core';
 import type { ContainerConfig, CredentialConfig, Verse } from '@multiverse/types';
 import type { Container } from 'dockerode';
@@ -229,7 +232,7 @@ export function buildContainerConfig({
   };
 }
 
-export async function startCommand(): Promise<void> {
+export async function startCommand(options: { template?: string }): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
   const scriptedPrompt = process.env.MULTIVERSE_CLAUDE_PRINT_PROMPT?.trim();
 
@@ -287,10 +290,26 @@ export async function startCommand(): Promise<void> {
   }
 
   const verseService = new VerseService();
-  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd());
+  const templateName = options.template ?? 'default';
+  const templatesDir = path.join(os.homedir(), '.multiverse', 'templates');
+  const templateService = new TemplateService(templatesDir);
+  const template = await templateService.findByName(templateName);
+  if (!template) {
+    console.error(`Template "${templateName}" not found`);
+    console.error(
+      '\nHint: create one with `multiverse template create default`',
+    );
+    process.exit(1);
+  }
+  const templateId = template.id;
+  const templateSnapshot = template.snapshot;
+  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), templateId);
   console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
   await syncCredentialFilesIntoVerseHome(verse.environment.hostPath, credentials);
+
+  await injectTemplateSnapshot(verse.environment.hostPath, templateSnapshot);
+  console.log(`✓ Template "${templateName}" configuration injected\n`);
 
   // Step 5: Create container config
   const config = buildContainerConfig({
@@ -319,6 +338,7 @@ export async function startCommand(): Promise<void> {
       cwd: process.cwd(),
       runId,
       startAt: startedAt,
+      templateId,
     });
     runStarted = true;
 
@@ -353,6 +373,7 @@ export async function startCommand(): Promise<void> {
       endAt: new Date().toISOString(),
       exitCode,
       containerId: container.id,
+      templateId,
     });
     runFinalized = true;
 
@@ -374,6 +395,7 @@ export async function startCommand(): Promise<void> {
           endAt: new Date().toISOString(),
           exitCode: 1,
           containerId: container.id,
+          templateId,
         });
       } catch (finalizeError) {
         console.error('Failed to finalize verse run:', finalizeError);

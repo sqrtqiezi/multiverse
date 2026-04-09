@@ -24,6 +24,7 @@ describe('VerseRepository', () => {
 
     const result = await repository.writeVerse({
       branch,
+      templateId: 'test-template',
       mutate: (verse) => {
         verse.runs.push({
           runId: 'run-1',
@@ -46,10 +47,11 @@ describe('VerseRepository', () => {
 
     const verse = await repository.writeVerse({
       branch,
+      templateId: 'test-template',
       mutate: () => undefined,
     });
 
-    expect(verse.schemaVersion).toBe(2);
+    expect(verse.schemaVersion).toBe(3);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.branch).toBe(branch);
     expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, verse.id));
@@ -67,6 +69,7 @@ describe('VerseRepository', () => {
 
     const verse = await repository.writeVerse({
       branch: 'main',
+      templateId: 'test-template',
       mutate: () => undefined,
     });
     const stats = await fs.stat(verse.environment.hostPath);
@@ -98,16 +101,17 @@ describe('VerseRepository', () => {
 
     const verse = await repository.writeVerse({
       branch,
+      templateId: 'test-template',
       mutate: () => undefined,
     });
     const persisted = await repository.readVerse(versePath);
 
-    expect(verse.schemaVersion).toBe(2);
+    expect(verse.schemaVersion).toBe(3);
     expect(verse.id).toBe(v1Content.id);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.runs).toEqual(v1Content.runs);
     expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, v1Content.id));
-    expect(persisted.schemaVersion).toBe(2);
+    expect(persisted.schemaVersion).toBe(3);
     expect(persisted.runs).toEqual(v1Content.runs);
     expect(persisted.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, v1Content.id));
   });
@@ -136,7 +140,7 @@ describe('VerseRepository', () => {
 
     const verse = await repository.readVerse(versePath);
 
-    expect(verse.schemaVersion).toBe(2);
+    expect(verse.schemaVersion).toBe(3);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.environment.hostPath).toBe(getVerseEnvironmentHostPath(tempDir, staleVerse.id));
     expect(verse.environment.containerPath).toBe(CLAUDE_HOME_CONTAINER_PATH);
@@ -167,6 +171,7 @@ describe('VerseRepository', () => {
 
     const verse = await repository.writeVerse({
       branch: requestedBranch,
+      templateId: 'test-template',
       mutate: () => undefined,
     });
     const persisted = await repository.readVerse(versePath);
@@ -235,6 +240,7 @@ describe('VerseRepository', () => {
 
     const writePromise = repository.writeVerse({
       branch,
+      templateId: 'test-template',
       mutate: (verse) => {
         verse.runs.push({
           runId: 'run-1',
@@ -257,5 +263,53 @@ describe('VerseRepository', () => {
       name: 'VerseCorruptedError',
     });
     expect(await fs.readFile(versePath, 'utf8')).toBe(originalContent);
+  });
+
+  it('creates a schema v3 verse with templateId', async () => {
+    const repository = new VerseRepository(tempDir);
+    const branch = 'main';
+
+    const verse = await repository.writeVerse({
+      branch,
+      templateId: 'tpl-001',
+      mutate: () => undefined,
+    });
+
+    expect(verse.schemaVersion).toBe(3);
+    expect(verse.templateId).toBe('tpl-001');
+  });
+
+  it('upgrades schema v2 verse to v3 with provided templateId', async () => {
+    const repository = new VerseRepository(tempDir);
+    const branch = 'main';
+    const versePath = getVersePath(tempDir, branch);
+    const v2Content = {
+      schemaVersion: 2,
+      id: 'verse-v2',
+      branch,
+      projectRoot: tempDir,
+      environment: {
+        hostPath: getVerseEnvironmentHostPath(tempDir, 'verse-v2'),
+        containerPath: CLAUDE_HOME_CONTAINER_PATH,
+        initializedAt: '2026-04-02T00:00:00.000Z',
+      },
+      createdAt: '2026-04-02T00:00:00.000Z',
+      updatedAt: '2026-04-02T00:00:00.000Z',
+      runs: [{ runId: 'run-1', startAt: '2026-04-02T00:00:00.000Z' }],
+    };
+
+    await fs.mkdir(path.dirname(versePath), { recursive: true });
+    await fs.writeFile(versePath, `${JSON.stringify(v2Content, null, 2)}\n`);
+
+    const verse = await repository.writeVerse({
+      branch,
+      templateId: 'migrated-tpl',
+      mutate: () => undefined,
+    });
+
+    expect(verse.schemaVersion).toBe(3);
+    expect(verse.templateId).toBe('migrated-tpl');
+    expect(verse.id).toBe('verse-v2');
+    expect(verse.runs).toEqual(v2Content.runs);
   });
 });

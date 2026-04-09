@@ -21,7 +21,7 @@ export interface PersistedVerseV1 {
   runs: RunRecord[];
 }
 
-export interface Verse {
+export interface PersistedVerseV2 {
   schemaVersion: 2;
   id: string;
   branch: string;
@@ -32,6 +32,18 @@ export interface Verse {
   runs: RunRecord[];
 }
 
-export type PersistedVerse = PersistedVerseV1 | Verse;
+export interface Verse {
+  schemaVersion: 3;
+  id: string;
+  branch: string;
+  projectRoot: string;
+  templateId: string;
+  environment: VerseEnvironment;
+  createdAt: string;
+  updatedAt: string;
+  runs: RunRecord[];
+}
+
+export type PersistedVerse = PersistedVerseV1 | PersistedVerseV2 | Verse;
 
 export type ArchivedSegment = Record<string, never>;

@@ -29,12 +29,12 @@ describe('VerseService', () => {
   it('returns schema v2 environment metadata when ensuring a verse for the current branch', async () => {
     const service = new VerseService();
 
-    const verse = await service.ensureVerseForCurrentBranch(tempDir);
+    const verse = await service.ensureVerseForCurrentBranch(tempDir, 'test-template');
     const expectedHostPath = path.join(tempDir, '.multiverse', 'verse-envs', verse.id, 'home');
     const versesDir = path.join(tempDir, '.multiverse', 'verses');
     const files = await fs.readdir(versesDir);
 
-    expect(verse.schemaVersion).toBe(2);
+    expect(verse.schemaVersion).toBe(3);
     expect(verse.projectRoot).toBe(tempDir);
     expect(verse.environment.hostPath).toBe(expectedHostPath);
     expect(verse.environment.containerPath).toBe(CLAUDE_HOME_CONTAINER_PATH);
@@ -49,8 +49,8 @@ describe('VerseService', () => {
   it('reuses the same verse environment path on repeated ensure calls', async () => {
     const service = new VerseService();
 
-    const first = await service.ensureVerseForCurrentBranch(tempDir);
-    const second = await service.ensureVerseForCurrentBranch(tempDir);
+    const first = await service.ensureVerseForCurrentBranch(tempDir, 'test-template');
+    const second = await service.ensureVerseForCurrentBranch(tempDir, 'test-template');
 
     expect(second.id).toBe(first.id);
     expect(second.branch).toBe(first.branch);
@@ -62,9 +62,9 @@ describe('VerseService', () => {
     await execFileAsync('git', ['checkout', '--detach'], { cwd: tempDir });
 
     const service = new VerseService();
-    const verse = await service.ensureVerseForCurrentBranch(tempDir);
+    const verse = await service.ensureVerseForCurrentBranch(tempDir, 'test-template');
 
-    expect(verse.schemaVersion).toBe(2);
+    expect(verse.schemaVersion).toBe(3);
     expect(verse.branch).toMatch(/^detached-/);
     expect(verse.environment.hostPath).toContain(path.join('.multiverse', 'verse-envs'));
   });
@@ -72,23 +72,25 @@ describe('VerseService', () => {
   it('appends a run start and then finalizes it by runId on schema v2 verses', async () => {
     const service = new VerseService();
 
-    const ensured = await service.ensureVerseForCurrentBranch(tempDir);
+    const ensured = await service.ensureVerseForCurrentBranch(tempDir, 'test-template');
 
-    expect(ensured.schemaVersion).toBe(2);
+    expect(ensured.schemaVersion).toBe(3);
 
     await service.appendRunStart({
       cwd: tempDir,
       runId: 'run-1',
       startAt: '2026-04-02T00:00:00.000Z',
+      templateId: 'test-template',
     });
     const started = await service.appendRunStart({
       cwd: tempDir,
       runId: 'run-2',
       startAt: '2026-04-02T00:00:30.000Z',
+      templateId: 'test-template',
     });
 
     expect(started.runs).toHaveLength(2);
-    expect(started.schemaVersion).toBe(2);
+    expect(started.schemaVersion).toBe(3);
     expect(started.runs[0]).toMatchObject({
       runId: 'run-1',
       startAt: '2026-04-02T00:00:00.000Z',
@@ -104,10 +106,11 @@ describe('VerseService', () => {
       endAt: '2026-04-02T00:01:00.000Z',
       exitCode: 0,
       containerId: 'container-1',
+      templateId: 'test-template',
     });
 
     expect(finalized.runs).toHaveLength(2);
-    expect(finalized.schemaVersion).toBe(2);
+    expect(finalized.schemaVersion).toBe(3);
     expect(finalized.runs.find((run) => run.runId === 'run-1')).toMatchObject({
       runId: 'run-1',
       startAt: '2026-04-02T00:00:00.000Z',
@@ -131,6 +134,7 @@ describe('VerseService', () => {
         endAt: '2026-04-02T00:01:00.000Z',
         exitCode: 1,
         containerId: 'container-1',
+        templateId: 'test-template',
       }),
     ).rejects.toMatchObject({ name: 'RunNotFoundError' });
   });
