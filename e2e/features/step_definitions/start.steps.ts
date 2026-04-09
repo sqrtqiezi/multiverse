@@ -273,6 +273,70 @@ Before(() => {
   resetScenarioState();
 });
 
+Given('a template named {string} exists', async (name: string) => {
+  const repoRoot = await getRepoRoot();
+  await ensureCliBuilt(repoRoot);
+  const home = path.join(repoRoot, '.e2e-tmp-home-with-creds');
+  const claudeDir = path.join(home, '.claude');
+  await fs.mkdir(claudeDir, { recursive: true });
+  // Ensure CLAUDE.md exists for template snapshot
+  const claudeMdPath = path.join(claudeDir, 'CLAUDE.md');
+  try {
+    await fs.access(claudeMdPath);
+  } catch {
+    await fs.writeFile(claudeMdPath, '# Claude configuration\n', 'utf8');
+  }
+  // Create a minimal plugin structure for snapshot
+  const pluginCacheDir = path.join(
+    claudeDir,
+    'plugins',
+    'cache',
+    'e2e-marketplace',
+    'e2e-plugin',
+    '1.0.0',
+  );
+  await fs.mkdir(pluginCacheDir, { recursive: true });
+  await fs.writeFile(
+    path.join(pluginCacheDir, 'plugin.json'),
+    JSON.stringify({ name: 'e2e-plugin', version: '1.0.0' }),
+  );
+  await fs.writeFile(
+    path.join(claudeDir, 'plugins', 'installed_plugins.json'),
+    JSON.stringify({
+      version: 2,
+      plugins: {
+        'e2e-plugin@e2e-marketplace': [
+          {
+            scope: 'user',
+            installPath: `${home}/.claude/plugins/cache/e2e-marketplace/e2e-plugin/1.0.0`,
+            version: '1.0.0',
+          },
+        ],
+      },
+    }),
+  );
+  // Create settings.json with enabledPlugins (hooks should be removed in snapshot)
+  await fs.writeFile(
+    path.join(claudeDir, 'settings.json'),
+    JSON.stringify({
+      enabledPlugins: { 'e2e-plugin@e2e-marketplace': true },
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: '',
+            hooks: [{ type: 'command', command: '/tmp/nonexistent-hook.sh' }],
+          },
+        ],
+      },
+    }),
+  );
+  const env = { ...process.env, HOME: home } as NodeJS.ProcessEnv;
+  await execAsync(`node packages/cli/dist/cli.js template create ${name}`, {
+    cwd: repoRoot,
+    env,
+  });
+});
+
 Given('Docker is not running', async () => {
   dockerMode = 'unavailable';
 });
@@ -457,6 +521,21 @@ Then('current branch verse should have a templateId', async () => {
   assert.ok((verse as { templateId?: string }).templateId, `Expected templateId in ${versePath}`);
 });
 
+Then('current branch verse environment should contain template config files', async () => {
+  const { verse, versePath } = await readCurrentVerse();
+  assert.ok(
+    verse.environment?.hostPath,
+    `Expected environment.hostPath in ${versePath}`,
+  );
+  const claudeDir = path.join(verse.environment.hostPath, '.claude');
+  const claudeDirExists = await pathExists(claudeDir);
+  assert(claudeDirExists, `Expected .claude directory in verse environment at ${claudeDir}`);
+
+  const claudeMdPath = path.join(verse.environment.hostPath, '.claude', 'CLAUDE.md');
+  const claudeMdExists = await pathExists(claudeMdPath);
+  assert(claudeMdExists, `Expected CLAUDE.md from template in verse environment at ${claudeMdPath}`);
+});
+
 Then('current branch verse environment directory should exist', async () => {
   const { verse } = await readCurrentVerse();
   const stats = await fs.stat(verse.environment.hostPath);
@@ -598,3 +677,51 @@ Then('latest run in current branch verse should contain finish fields', async ()
     `Expected latest run containerId to be a string in ${versePath}, got ${typeof latestRun.containerId}`,
   );
 });
+
+Then(
+  'current branch verse environment should contain plugin files with rewritten paths',
+  async () => {
+    const { verse, versePath } = await readCurrentVerse();
+    assert.ok(verse.environment?.hostPath, `Expected environment.hostPath in ${versePath}`);
+
+    // Check plugin cache files exist
+    const pluginJsonPath = path.join(
+      verse.environment.hostPath,
+      '.claude',
+      'plugins',
+      'cache',
+      'e2e-marketplace',
+      'e2e-plugin',
+      '1.0.0',
+      'plugin.json',
+    );
+    assert(await pathExists(pluginJsonPath), `Expected plugin file at ${pluginJsonPath}`);
+
+    // Check installed_plugins.json has rewritten paths
+    const installedPluginsPath = path.join(
+      verse.environment.hostPath,
+      '.claude',
+      'plugins',
+      'installed_plugins.json',
+    );
+    const installedContent = await fs.readFile(installedPluginsPath, 'utf8');
+    const installed = JSON.parse(installedContent);
+    const entries = installed.plugins['e2e-plugin@e2e-marketplace'];
+    assert.ok(entries && entries.length > 0, 'Expected plugin entry in installed_plugins.json');
+    assert(
+      entries[0].installPath.startsWith('/home/coder/'),
+      `Expected installPath to start with /home/coder/, got: ${entries[0].installPath}`,
+    );
+
+    // Check settings.json has no hooks but has enabledPlugins
+    const settingsPath = path.join(verse.environment.hostPath, '.claude', 'settings.json');
+    const settingsContent = await fs.readFile(settingsPath, 'utf8');
+    const settings = JSON.parse(settingsContent);
+    assert.strictEqual(
+      settings.hooks,
+      undefined,
+      'Expected hooks to be removed from settings.json',
+    );
+    assert.ok(settings.enabledPlugins, 'Expected enabledPlugins to be present in settings.json');
+  },
+);
