@@ -41,9 +41,8 @@ function rewriteKnownMarketplaces(content: string): string {
         'installLocation' in marketplace &&
         typeof (marketplace as Record<string, unknown>).installLocation === 'string'
       ) {
-        (marketplace as Record<string, string>).installLocation = rewriteClaudePath(
-          (marketplace as Record<string, string>).installLocation,
-        );
+        const loc = (marketplace as Record<string, unknown>).installLocation as string;
+        (marketplace as Record<string, unknown>).installLocation = rewriteClaudePath(loc);
       }
     }
     return JSON.stringify(data, null, 2);
