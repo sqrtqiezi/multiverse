@@ -10,7 +10,11 @@ function createProgram() {
 
   program.name(CLI_NAME).version(CLI_VERSION).description('Coding agent harness management tool');
 
-  program.command('start').description('Start a containerized coding agent').action(startCommand);
+  program
+    .command('start')
+    .description('Start a containerized coding agent')
+    .option('--template <name>', 'Use a named configuration template')
+    .action(startCommand);
 
   const { command: templateCommand } = createTemplateCommand();
   program.addCommand(templateCommand);
