@@ -72,3 +72,65 @@ describe('config.listFiles', () => {
     expect(result.groups.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('config.readFile', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gui-server-read-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('reads file content', async () => {
+    const filePath = path.join(tmpDir, 'test.md');
+    await fs.writeFile(filePath, '# Hello World');
+    const result = (await configMethods['config.readFile']!({ filePath })) as { content: string };
+    expect(result.content).toBe('# Hello World');
+  });
+
+  it('throws for nonexistent file', async () => {
+    await expect(
+      configMethods['config.readFile']!({ filePath: path.join(tmpDir, 'missing.md') }),
+    ).rejects.toThrow();
+  });
+});
+
+describe('config.writeFile', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gui-server-write-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes content to file', async () => {
+    const filePath = path.join(tmpDir, 'test.md');
+    await fs.writeFile(filePath, 'old');
+    const result = (await configMethods['config.writeFile']!({
+      filePath,
+      content: '# New Content',
+    })) as { success: boolean };
+
+    expect(result.success).toBe(true);
+    const content = await fs.readFile(filePath, 'utf8');
+    expect(content).toBe('# New Content');
+  });
+
+  it('creates file if it does not exist', async () => {
+    const filePath = path.join(tmpDir, 'new.md');
+    const result = (await configMethods['config.writeFile']!({
+      filePath,
+      content: '# Created',
+    })) as { success: boolean };
+
+    expect(result.success).toBe(true);
+    const content = await fs.readFile(filePath, 'utf8');
+    expect(content).toBe('# Created');
+  });
+});
