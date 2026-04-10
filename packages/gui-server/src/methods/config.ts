@@ -44,13 +44,27 @@ async function scanConfigFiles(basePath: string): Promise<ConfigFile[]> {
 
 async function scanDirRecursive(dir: string, baseDir: string): Promise<ConfigFile[]> {
   const EXCLUDED = new Set([
-    'projects', 'teams', 'tasks', 'worktrees', 'memory', 'file-history',
-    'usage-data', 'telemetry', 'paste-cache', 'session-env', 'todos',
-    'backups', 'shell-snapshots', 'sessions', 'plans', 'cache', 'plugins',
+    'projects',
+    'teams',
+    'tasks',
+    'worktrees',
+    'memory',
+    'file-history',
+    'usage-data',
+    'telemetry',
+    'paste-cache',
+    'session-env',
+    'todos',
+    'backups',
+    'shell-snapshots',
+    'sessions',
+    'plans',
+    'cache',
+    'plugins',
   ]);
   const files: ConfigFile[] = [];
 
-  let entries;
+  let entries: Awaited<ReturnType<typeof fs.readdir<{ withFileTypes: true }>>>;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
@@ -59,7 +73,7 @@ async function scanDirRecursive(dir: string, baseDir: string): Promise<ConfigFil
 
   for (const entry of entries) {
     const relativePath = path.relative(baseDir, path.join(dir, entry.name));
-    const topSegment = relativePath.split(path.sep)[0]!;
+    const topSegment = relativePath.split(path.sep)[0] ?? '';
 
     if (entry.isDirectory()) {
       if (EXCLUDED.has(topSegment)) continue;
