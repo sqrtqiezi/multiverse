@@ -21,7 +21,7 @@ export function EditorPanel({ filePath, content, onContentChange, onSave, isDirt
   const language = detectLanguage(filePath);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="editor-panel">
       <div className="flex items-center justify-between border-b px-4 py-2">
         <span className="text-sm font-medium">
           {fileName}
@@ -29,6 +29,7 @@ export function EditorPanel({ filePath, content, onContentChange, onSave, isDirt
         </span>
         <button
           type="button"
+          data-testid="save-button"
           className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
           onClick={onSave}
           disabled={!isDirty}

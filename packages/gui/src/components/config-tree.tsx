@@ -21,7 +21,7 @@ function TreeGroup({
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="mb-2">
+    <div className="mb-2" data-testid={`config-group-${group.label}`}>
       <button
         type="button"
         className="flex w-full items-center gap-1 px-2 py-1 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent rounded"
@@ -40,6 +40,7 @@ function TreeGroup({
               <button
                 type="button"
                 key={fullPath}
+                data-testid={`config-file-${file.path.split('/').pop()}`}
                 className={`flex w-full items-center gap-1 px-2 py-1 text-sm rounded ${
                   isSelected
                     ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -63,7 +64,7 @@ function TreeGroup({
 
 export function ConfigTree({ groups, selectedFile, onFileSelect }: ConfigTreeProps) {
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full" data-testid="config-sidebar">
       <div className="p-2">
         <h2 className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           配置
