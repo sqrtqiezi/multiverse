@@ -1,9 +1,10 @@
 import type { Template } from '@multiverse/types';
 import { describe, expect, it } from 'vitest';
+import { computeSnapshotFingerprint } from '../template-fingerprint.js';
 import { TemplateValidator } from '../template-validator.js';
 
 function validTemplate(overrides: Partial<Template> = {}): Template {
-  return {
+  const template: Template = {
     id: 'tpl-valid',
     name: 'valid',
     snapshot: {
@@ -12,6 +13,11 @@ function validTemplate(overrides: Partial<Template> = {}): Template {
     },
     createdAt: '2026-04-07T10:00:00.000Z',
     ...overrides,
+  };
+
+  return {
+    ...template,
+    fingerprint: overrides.fingerprint ?? computeSnapshotFingerprint(template.snapshot),
   };
 }
 

@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLAUDE_HOME_CONTAINER_PATH } from '../claude-home.js';
 import { VerseService } from '../verse-service.js';
 
@@ -122,6 +122,30 @@ describe('VerseService', () => {
       runId: 'run-2',
       startAt: '2026-04-02T00:00:30.000Z',
     });
+  });
+
+  it('updates only the current branch template id without changing verse identity', async () => {
+    const service = new VerseService();
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-04-02T00:00:00.000Z'));
+      const ensured = await service.ensureVerseForCurrentBranch(tempDir, 'template-old');
+
+      vi.setSystemTime(new Date('2026-04-02T00:00:00.001Z'));
+      const updated = await service.updateTemplateForCurrentBranch(tempDir, 'template-new');
+
+      expect(updated.id).toBe(ensured.id);
+      expect(updated.branch).toBe(ensured.branch);
+      expect(updated.projectRoot).toBe(ensured.projectRoot);
+      expect(updated.environment).toEqual(ensured.environment);
+      expect(updated.createdAt).toBe(ensured.createdAt);
+      expect(updated.updatedAt).toBe('2026-04-02T00:00:00.001Z');
+      expect(updated.templateId).toBe('template-new');
+      expect(updated.runs).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('throws RunNotFoundError when finalizing an unknown runId', async () => {

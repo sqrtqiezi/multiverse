@@ -41,6 +41,7 @@ Feature: Zero-config container start
     Given Docker is available
     And Claude credentials exist
     And Ollama Anthropic-compatible API is available
+    And a template named "default" exists
     When I run "multiverse start"
     Then the output should contain "Container started"
     And the output should contain "E2E_OLLAMA_OK_20260403"

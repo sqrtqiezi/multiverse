@@ -39,9 +39,13 @@ describe('Error Templates', () => {
     }
   });
 
-  it('should have exitCode of 1 for all templates', () => {
-    for (const template of Object.values(ERROR_TEMPLATES)) {
-      expect(template.exitCode).toBe(1);
+  it('should have exitCode of 1 for all error templates except START_CANCELLED', () => {
+    for (const [code, template] of Object.entries(ERROR_TEMPLATES)) {
+      if (code === ErrorCode.START_CANCELLED) {
+        expect(template.exitCode).toBe(0);
+      } else {
+        expect(template.exitCode).toBe(1);
+      }
     }
   });
 
@@ -143,6 +147,15 @@ describe('Error Templates', () => {
       expect(template.title).toContain('未知');
       expect(template.suggestions).toHaveLength(3);
       expect(template.suggestions.some((s) => s.includes('GitHub'))).toBe(true);
+    });
+  });
+
+  describe('START_CANCELLED template', () => {
+    it('should have correct content', () => {
+      const template = ERROR_TEMPLATES[ErrorCode.START_CANCELLED];
+
+      expect(template.title).toContain('取消');
+      expect(template.exitCode).toBe(0);
     });
   });
 });
