@@ -6,12 +6,23 @@
   "dependencies": {
     "@multiverse/core": "workspace:*",
     "@multiverse/types": "workspace:*",
+    "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/api": "^2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.8.0",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "react-resizable-panels": "^4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@types/node": "^22.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
