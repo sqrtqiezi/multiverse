@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Toaster, toast } from 'sonner';
 import { AppLayout } from './components/app-layout';
+import { rpcCall } from './lib/rpc';
 import type { ConfigFile, ConfigGroup } from './types';
-
-// Stub RPC — will be replaced with real Tauri invoke in Task 10
-async function rpcCall(method: string, params: Record<string, unknown>): Promise<unknown> {
-  console.log('RPC stub:', method, params);
-  return null;
-}
 
 function App() {
   const [groups, setGroups] = useState<ConfigGroup[]>([]);
@@ -19,13 +14,11 @@ function App() {
 
   const loadFileTree = useCallback(async () => {
     try {
-      const result = (await rpcCall('config.listFiles', {
-        projectPath: '/tmp/multiverse-demo',
-        homePath: '/tmp/multiverse-demo-home',
-      })) as { groups: ConfigGroup[] } | null;
-      if (result) {
-        setGroups(result.groups);
-      }
+      const result = await rpcCall<{ groups: ConfigGroup[] }>('config.listFiles', {
+        projectPath: process.cwd?.() ?? '.',
+        homePath: process.env?.HOME ?? '~',
+      });
+      setGroups(result.groups);
     } catch (error) {
       toast.error(`加载配置树失败: ${error}`);
     }
@@ -34,14 +27,10 @@ function App() {
   const handleFileSelect = useCallback(async (basePath: string, file: ConfigFile) => {
     const fullPath = `${basePath}/${file.path}`;
     try {
-      const result = (await rpcCall('config.readFile', { filePath: fullPath })) as {
-        content: string;
-      } | null;
-      if (result) {
-        setSelectedFile(fullPath);
-        setFileContent(result.content);
-        setSavedContent(result.content);
-      }
+      const result = await rpcCall<{ content: string }>('config.readFile', { filePath: fullPath });
+      setSelectedFile(fullPath);
+      setFileContent(result.content);
+      setSavedContent(result.content);
     } catch (error) {
       toast.error(`读取文件失败: ${error}`);
     }
@@ -58,7 +47,6 @@ function App() {
     }
   }, [selectedFile, fileContent]);
 
-  // Load file tree on mount
   useEffect(() => {
     loadFileTree();
   }, [loadFileTree]);
