@@ -18,4 +18,5 @@ export enum ErrorCode {
 
   // 通用错误
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+  START_CANCELLED = 'START_CANCELLED',
 }

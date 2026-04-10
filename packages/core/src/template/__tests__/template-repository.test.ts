@@ -3,10 +3,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import type { Template } from '@multiverse/types';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { computeSnapshotFingerprint } from '../template-fingerprint.js';
 import { TemplateRepository } from '../template-repository.js';
 
 function createTestTemplate(overrides: Partial<Template> = {}): Template {
-  return {
+  const template: Template = {
     id: 'tpl-test-001',
     name: 'test-template',
     snapshot: {
@@ -15,6 +16,11 @@ function createTestTemplate(overrides: Partial<Template> = {}): Template {
     },
     createdAt: '2026-04-07T10:00:00.000Z',
     ...overrides,
+  };
+
+  return {
+    ...template,
+    fingerprint: overrides.fingerprint ?? computeSnapshotFingerprint(template.snapshot),
   };
 }
 
@@ -51,6 +57,29 @@ describe('TemplateRepository', () => {
     const filePath = path.join(tempDir, `${tpl.id}.json`);
     const raw = await fs.readFile(filePath, 'utf8');
     expect(JSON.parse(raw)).toEqual(tpl);
+  });
+
+  it('backfills fingerprint when reading a legacy template file', async () => {
+    const legacyTemplate = {
+      id: 'tpl-legacy',
+      name: 'legacy',
+      snapshot: {
+        claudeMd: '# Legacy',
+        files: [{ path: 'settings.json', content: '{}' }],
+      },
+      createdAt: '2026-04-07T10:00:00.000Z',
+    };
+
+    await fs.mkdir(tempDir, { recursive: true });
+    await fs.writeFile(
+      path.join(tempDir, `${legacyTemplate.id}.json`),
+      `${JSON.stringify(legacyTemplate, null, 2)}\n`,
+      'utf8',
+    );
+
+    const loaded = await repo.findById(legacyTemplate.id);
+
+    expect(loaded?.fingerprint).toBe(computeSnapshotFingerprint(legacyTemplate.snapshot));
   });
 
   it('finds a template by name', async () => {

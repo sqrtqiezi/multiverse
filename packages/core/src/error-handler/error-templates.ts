@@ -126,4 +126,14 @@ export const ERROR_TEMPLATES: Record<ErrorCode, ErrorTemplate> = {
     ],
     exitCode: 1,
   },
+
+  [ErrorCode.START_CANCELLED]: {
+    title: '启动已取消',
+    description: '用户选择取消启动。',
+    reason: '用户在 drift 检测提示中选择了取消',
+    suggestions: [
+      '重新运行 multiverse start 并选择其他选项',
+    ],
+    exitCode: 0,
+  },
 };

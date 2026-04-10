@@ -60,7 +60,9 @@ if (isDirectExecution) {
     const appError = toAppError(error);
     const formatted = handler.format(appError);
 
-    console.error(formatErrorOutput(formatted));
+    if (formatted.exitCode !== 0) {
+      console.error(formatErrorOutput(formatted));
+    }
     process.exit(formatted.exitCode);
   });
 }

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { Template } from '@multiverse/types';
+import { computeSnapshotFingerprint } from './template-fingerprint.js';
 
 export class TemplateRepository {
   constructor(private readonly templatesDir: string) {}
@@ -15,7 +16,7 @@ export class TemplateRepository {
     const filePath = path.join(this.templatesDir, `${id}.json`);
     try {
       const raw = await fs.readFile(filePath, 'utf8');
-      return JSON.parse(raw) as Template;
+      return this.hydrateTemplate(JSON.parse(raw) as Partial<Template>);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return undefined;
@@ -45,11 +46,22 @@ export class TemplateRepository {
       if (!entry.endsWith('.json')) continue;
       const filePath = path.join(this.templatesDir, entry);
       const raw = await fs.readFile(filePath, 'utf8');
-      templates.push(JSON.parse(raw) as Template);
+      templates.push(this.hydrateTemplate(JSON.parse(raw) as Partial<Template>));
     }
 
     return templates.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
+  }
+
+  private hydrateTemplate(template: Partial<Template>): Template {
+    if (!template.snapshot) {
+      return template as Template;
+    }
+
+    return {
+      ...template,
+      fingerprint: template.fingerprint ?? computeSnapshotFingerprint(template.snapshot),
+    } as Template;
   }
 }

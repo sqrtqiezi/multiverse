@@ -34,6 +34,19 @@ export class VerseService {
     });
   }
 
+  async updateTemplateForCurrentBranch(cwd: string, templateId: string): Promise<Verse> {
+    const branch = await this.branchResolver.getCurrentBranch(cwd);
+    const repository = new VerseRepository(cwd);
+
+    return await repository.writeVerse({
+      branch,
+      templateId,
+      mutate: (verse) => {
+        verse.templateId = templateId;
+      },
+    });
+  }
+
   async appendRunStart({ cwd, runId, startAt, templateId }: AppendRunStartInput): Promise<Verse> {
     const branch = await this.branchResolver.getCurrentBranch(cwd);
     const repository = new VerseRepository(cwd);

@@ -8,6 +8,7 @@ Feature: Verse persistence for start runs
     And Claude credentials exist
     And Ollama Anthropic-compatible API is available
     And marker-writing prompt mode is enabled
+    And a template named "default" exists
 
   Scenario: First successful start creates verse file and environment directory
     Given verse file for current branch should not exist

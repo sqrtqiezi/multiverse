@@ -331,6 +331,21 @@ Given('a template named {string} exists', async (name: string) => {
     }),
   );
   const env = { ...process.env, HOME: home } as NodeJS.ProcessEnv;
+  // Remove existing template with the same name to make this step idempotent
+  const templatesDir = path.join(home, '.multiverse', 'templates');
+  try {
+    const entries = await fs.readdir(templatesDir);
+    for (const entry of entries) {
+      if (!entry.endsWith('.json')) continue;
+      const raw = await fs.readFile(path.join(templatesDir, entry), 'utf8');
+      const tpl = JSON.parse(raw) as { name: string };
+      if (tpl.name === name) {
+        await fs.rm(path.join(templatesDir, entry));
+      }
+    }
+  } catch {
+    // templates dir may not exist yet
+  }
   await execAsync(`node packages/cli/dist/cli.js template create ${name}`, {
     cwd: repoRoot,
     env,
@@ -387,6 +402,7 @@ When('I run {string}', async (command: string) => {
     ? `node packages/cli/dist/cli.js ${command.slice('multiverse '.length)}`
     : command;
   const env = { ...process.env } as Record<string, string | undefined>;
+  env.MULTIVERSE_DRIFT_ACTION = 'keep';
 
   if (dockerMode === 'unavailable') {
     env.DOCKER_HOST = 'unix:///var/run/nonexistent-docker.sock';
@@ -460,13 +476,13 @@ After(async () => {
 
 Then('the output should contain {string}', (expectedText: string) => {
   assert(
-    commandOutput.includes(expectedText),
-    `Expected output to contain "${expectedText}", but got: ${commandOutput}`,
+    sharedState.commandOutput.includes(expectedText),
+    `Expected output to contain "${expectedText}", but got: ${sharedState.commandOutput}`,
   );
 });
 
 Then('the exit code should be {int}', (expectedCode: number) => {
-  assert.strictEqual(commandExitCode, expectedCode);
+  assert.strictEqual(sharedState.commandExitCode, expectedCode);
 });
 
 Then('a container should be created', async () => {
@@ -484,7 +500,7 @@ Then('the container should be running', async () => {
 });
 
 Then('I should see {string}', (expectedText: string) => {
-  assert(commandOutput.includes(expectedText));
+  assert(sharedState.commandOutput.includes(expectedText));
 });
 
 Then('verse file for current branch should exist', async () => {
@@ -523,17 +539,17 @@ Then('current branch verse should have a templateId', async () => {
 
 Then('current branch verse environment should contain template config files', async () => {
   const { verse, versePath } = await readCurrentVerse();
-  assert.ok(
-    verse.environment?.hostPath,
-    `Expected environment.hostPath in ${versePath}`,
-  );
+  assert.ok(verse.environment?.hostPath, `Expected environment.hostPath in ${versePath}`);
   const claudeDir = path.join(verse.environment.hostPath, '.claude');
   const claudeDirExists = await pathExists(claudeDir);
   assert(claudeDirExists, `Expected .claude directory in verse environment at ${claudeDir}`);
 
   const claudeMdPath = path.join(verse.environment.hostPath, '.claude', 'CLAUDE.md');
   const claudeMdExists = await pathExists(claudeMdPath);
-  assert(claudeMdExists, `Expected CLAUDE.md from template in verse environment at ${claudeMdPath}`);
+  assert(
+    claudeMdExists,
+    `Expected CLAUDE.md from template in verse environment at ${claudeMdPath}`,
+  );
 });
 
 Then('current branch verse environment directory should exist', async () => {

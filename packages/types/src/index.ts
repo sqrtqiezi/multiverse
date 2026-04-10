@@ -8,5 +8,10 @@ export interface AgentConfig {
 }
 
 export * from './docker.js';
-export * from './template.js';
+export type {
+  ConfigDriftCheckResult,
+  ConfigSnapshot,
+  SnapshotFile,
+  Template,
+} from './template.js';
 export * from './verse.js';

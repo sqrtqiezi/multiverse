@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Template } from '@multiverse/types';
 import { createConfigSnapshot } from './config-snapshot.js';
+import { computeSnapshotFingerprint } from './template-fingerprint.js';
 import { TemplateRepository } from './template-repository.js';
 import { TemplateValidator } from './template-validator.js';
 
@@ -8,6 +9,11 @@ type CreateTemplateInput = {
   name: string;
   homeDir: string;
   description?: string;
+};
+
+type CreateSyncedTemplateInput = {
+  baseTemplateName: string;
+  homeDir: string;
 };
 
 export class TemplateService {
@@ -20,18 +26,34 @@ export class TemplateService {
   }
 
   async create({ name, homeDir, description }: CreateTemplateInput): Promise<Template> {
+    return this.createTemplate({ name, homeDir, description });
+  }
+
+  async createSyncedTemplate({
+    baseTemplateName,
+    homeDir,
+  }: CreateSyncedTemplateInput): Promise<Template> {
+    return this.createTemplate({
+      name: `${baseTemplateName}-sync-${new Date().toISOString()}`,
+      homeDir,
+    });
+  }
+
+  private async createTemplate({ name, homeDir, description }: CreateTemplateInput): Promise<Template> {
     const existing = await this.repository.findByName(name);
     if (existing) {
       throw new Error(`Template with name "${name}" already exists (id: ${existing.id})`);
     }
 
     const snapshot = await createConfigSnapshot(homeDir);
+    const fingerprint = computeSnapshotFingerprint(snapshot);
 
     const template: Template = {
       id: randomUUID(),
       name,
       description,
       snapshot,
+      fingerprint,
       createdAt: new Date().toISOString(),
     };
 

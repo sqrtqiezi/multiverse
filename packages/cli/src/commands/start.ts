@@ -5,20 +5,22 @@ import { createServer, request as httpRequest, type Server } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import type { AppError } from '@multiverse/core';
 import {
   CLAUDE_HOME_CONTAINER_PATH,
   ContainerManager,
   CredentialResolver,
+  checkTemplateDrift,
   DockerClient,
   ErrorCode,
   ImageBuilder,
+  injectTemplateSnapshot,
   ORIGINAL_ANTHROPIC_BASE_URL_ENV,
   PreflightChecker,
   TemplateService,
   VerseService,
-  injectTemplateSnapshot,
 } from '@multiverse/core';
 import type { ContainerConfig, CredentialConfig, Verse } from '@multiverse/types';
 import type { Container } from 'dockerode';
@@ -29,6 +31,8 @@ interface AnthropicBaseUrlProxy {
   baseUrl: string;
   server: Server;
 }
+
+type DriftAction = 'keep' | 'sync-and-switch' | 'cancel';
 
 function findWorkspaceRoot(startDir: string): string {
   let currentDir = startDir;
@@ -75,6 +79,59 @@ async function closeAnthropicBaseUrlProxy(proxy?: AnthropicBaseUrlProxy) {
     });
   });
 }
+
+export async function promptForDriftAction({
+  templateName,
+  drift,
+  input = process.stdin,
+  output = process.stdout,
+}: {
+  templateName: string;
+  drift: Awaited<ReturnType<typeof checkTemplateDrift>>;
+  input?: NodeJS.ReadStream;
+  output?: NodeJS.WriteStream;
+}): Promise<DriftAction> {
+  const rl = createInterface({ input, output });
+
+  try {
+    console.log(`Current global config has drifted from template "${templateName}".`);
+    if (drift.addedFiles.length > 0) {
+      console.log(`Added files: ${drift.addedFiles.join(', ')}`);
+    }
+    if (drift.modifiedFiles.length > 0) {
+      console.log(`Modified files: ${drift.modifiedFiles.join(', ')}`);
+    }
+    if (drift.removedFiles.length > 0) {
+      console.log(`Removed files: ${drift.removedFiles.join(', ')}`);
+    }
+    console.log('1) Keep current template');
+    console.log('2) Sync and switch to a new template');
+    console.log('3) Cancel start');
+
+    for (;;) {
+      const answer = (await rl.question('Choose an option [1-3]: ')).trim().toLowerCase();
+
+      if (answer === '1' || answer === 'keep') {
+        return 'keep';
+      }
+      if (answer === '2' || answer === 'sync-and-switch') {
+        return 'sync-and-switch';
+      }
+      if (answer === '3' || answer === 'cancel') {
+        return 'cancel';
+      }
+
+      console.log('Please enter 1, 2, or 3.');
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+type StartCommandOptions = {
+  template?: string;
+  promptForDriftAction?: typeof promptForDriftAction;
+};
 
 async function startAnthropicBaseUrlProxy(
   containerBaseUrl: string,
@@ -232,9 +289,10 @@ export function buildContainerConfig({
   };
 }
 
-export async function startCommand(options: { template?: string }): Promise<void> {
+export async function startCommand(options: StartCommandOptions): Promise<void> {
   console.log('🚀 Starting multiverse...\n');
   const scriptedPrompt = process.env.MULTIVERSE_CLAUDE_PRINT_PROMPT?.trim();
+  const resolveDriftAction = options.promptForDriftAction ?? promptForDriftAction;
 
   // Step 1: Run preflight checks (Docker, credentials, workspace, disk space)
   const preflightChecker = new PreflightChecker();
@@ -296,27 +354,66 @@ export async function startCommand(options: { template?: string }): Promise<void
   const template = await templateService.findByName(templateName);
   if (!template) {
     console.error(`Template "${templateName}" not found`);
-    console.error(
-      '\nHint: create one with `multiverse template create default`',
-    );
+    console.error('\nHint: create one with `multiverse template create default`');
     process.exit(1);
   }
-  const templateId = template.id;
-  const templateSnapshot = template.snapshot;
-  const verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), templateId);
-  console.log(`✓ Verse ready for branch ${verse.branch}\n`);
 
-  await syncCredentialFilesIntoVerseHome(verse.environment.hostPath, credentials);
+  let activeTemplate = template;
+  let verse = await verseService.ensureVerseForCurrentBranch(process.cwd(), activeTemplate.id);
 
-  await injectTemplateSnapshot(verse.environment.hostPath, templateSnapshot);
-  console.log(`✓ Template "${templateName}" configuration injected\n`);
+  // If the verse is already bound to a different template (e.g. from a previous sync-and-switch),
+  // check drift against the verse's actual template instead of the named one.
+  if (verse.templateId !== template.id) {
+    const verseTemplate = await templateService.findById(verse.templateId);
+    if (verseTemplate) {
+      activeTemplate = verseTemplate;
+    }
+  }
+
+  const drift = await checkTemplateDrift({
+    homeDir: os.homedir(),
+    template: activeTemplate,
+  });
+
+  if (drift.isDrifted) {
+    const envDriftAction = process.env.MULTIVERSE_DRIFT_ACTION as DriftAction | undefined;
+    const driftAction =
+      envDriftAction ?? (await resolveDriftAction({ templateName: activeTemplate.name, drift }));
+
+    if (driftAction === 'cancel') {
+      console.log('Start cancelled');
+      throw {
+        code: ErrorCode.START_CANCELLED,
+        message: 'Start cancelled',
+      } as AppError;
+    }
+
+    if (driftAction === 'sync-and-switch') {
+      const syncedTemplate = await templateService.createSyncedTemplate({
+        baseTemplateName: template.name,
+        homeDir: os.homedir(),
+      });
+      verse = await verseService.updateTemplateForCurrentBranch(process.cwd(), syncedTemplate.id);
+      activeTemplate = syncedTemplate;
+      console.log(`Created synced template "${syncedTemplate.name}"\n`);
+    }
+  }
+
+  const activeVerse = verse;
+
+  console.log(`✓ Verse ready for branch ${activeVerse.branch}\n`);
+
+  await syncCredentialFilesIntoVerseHome(activeVerse.environment.hostPath, credentials);
+
+  await injectTemplateSnapshot(activeVerse.environment.hostPath, activeTemplate.snapshot);
+  console.log(`✓ Template "${activeTemplate.name}" configuration injected\n`);
 
   // Step 5: Create container config
   const config = buildContainerConfig({
     cwd: process.cwd(),
     imageTag,
     scriptedPrompt,
-    verse,
+    verse: activeVerse,
     credentials,
     extraHosts:
       process.platform === 'linux' && usesHostDockerInternal(credentials.envVars.ANTHROPIC_BASE_URL)
@@ -338,7 +435,7 @@ export async function startCommand(options: { template?: string }): Promise<void
       cwd: process.cwd(),
       runId,
       startAt: startedAt,
-      templateId,
+      templateId: activeTemplate.id,
     });
     runStarted = true;
 
@@ -373,7 +470,7 @@ export async function startCommand(options: { template?: string }): Promise<void
       endAt: new Date().toISOString(),
       exitCode,
       containerId: container.id,
-      templateId,
+      templateId: activeTemplate.id,
     });
     runFinalized = true;
 
@@ -395,7 +492,7 @@ export async function startCommand(options: { template?: string }): Promise<void
           endAt: new Date().toISOString(),
           exitCode: 1,
           containerId: container.id,
-          templateId,
+          templateId: activeTemplate.id,
         });
       } catch (finalizeError) {
         console.error('Failed to finalize verse run:', finalizeError);

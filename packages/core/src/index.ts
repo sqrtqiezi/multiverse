@@ -22,6 +22,11 @@ export { BranchResolver } from './git/branch-resolver.js';
 export { PreflightChecker } from './preflight/index.js';
 // Export template modules
 export { createConfigSnapshot } from './template/config-snapshot.js';
+export { checkTemplateDrift } from './template/config-drift.js';
+export {
+  computeCurrentConfigFingerprint,
+  computeSnapshotFingerprint,
+} from './template/template-fingerprint.js';
 export { injectTemplateSnapshot } from './template/template-injector.js';
 export { TemplateRepository } from './template/template-repository.js';
 export { TemplateService } from './template/template-service.js';
