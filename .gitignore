@@ -24,6 +24,9 @@ Thumbs.db
 # Worktrees
 .worktrees/
 
+# E2E temp homes
+.e2e-tmp-home-with-creds/
+
 # Reports
 reports/
 
