@@ -13,10 +13,6 @@
     }
   },
   "files": ["dist"],
-  "dependencies": {
-    "@multiverse/core": "workspace:*",
-    "@multiverse/types": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "^22.0.0"
   },

@@ -163,13 +163,6 @@ importers:
         version: 6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/gui-server:
-    dependencies:
-      '@multiverse/core':
-        specifier: workspace:*
-        version: link:../core
-      '@multiverse/types':
-        specifier: workspace:*
-        version: link:../types
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

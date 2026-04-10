@@ -1,4 +1,4 @@
-import { MonacoWrapper, detectLanguage } from './monaco-wrapper';
+import { detectLanguage, MonacoWrapper } from './monaco-wrapper';
 
 interface EditorPanelProps {
   filePath: string | null;
@@ -8,7 +8,13 @@ interface EditorPanelProps {
   isDirty: boolean;
 }
 
-export function EditorPanel({ filePath, content, onContentChange, onSave, isDirty }: EditorPanelProps) {
+export function EditorPanel({
+  filePath,
+  content,
+  onContentChange,
+  onSave,
+  isDirty,
+}: EditorPanelProps) {
   if (!filePath) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">

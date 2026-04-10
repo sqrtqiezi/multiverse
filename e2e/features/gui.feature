@@ -1,3 +1,4 @@
+@gui
 Feature: GUI configuration management
   As a developer
   I want to view and edit configurations through a GUI

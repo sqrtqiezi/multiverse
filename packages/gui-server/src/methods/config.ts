@@ -42,26 +42,27 @@ async function scanConfigFiles(basePath: string): Promise<ConfigFile[]> {
   return files;
 }
 
+const EXCLUDED = new Set([
+  'projects',
+  'teams',
+  'tasks',
+  'worktrees',
+  'memory',
+  'file-history',
+  'usage-data',
+  'telemetry',
+  'paste-cache',
+  'session-env',
+  'todos',
+  'backups',
+  'shell-snapshots',
+  'sessions',
+  'plans',
+  'cache',
+  'plugins',
+]);
+
 async function scanDirRecursive(dir: string, baseDir: string): Promise<ConfigFile[]> {
-  const EXCLUDED = new Set([
-    'projects',
-    'teams',
-    'tasks',
-    'worktrees',
-    'memory',
-    'file-history',
-    'usage-data',
-    'telemetry',
-    'paste-cache',
-    'session-env',
-    'todos',
-    'backups',
-    'shell-snapshots',
-    'sessions',
-    'plans',
-    'cache',
-    'plugins',
-  ]);
   const files: ConfigFile[] = [];
 
   let entries: Awaited<ReturnType<typeof fs.readdir<{ withFileTypes: true }>>>;

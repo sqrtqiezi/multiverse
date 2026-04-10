@@ -1,7 +1,7 @@
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import type { ConfigFile, ConfigGroup } from '@/types';
 import { ConfigTree } from './config-tree';
 import { EditorPanel } from './editor-panel';
-import type { ConfigFile, ConfigGroup } from '@/types';
 
 interface AppLayoutProps {
   groups: ConfigGroup[];
