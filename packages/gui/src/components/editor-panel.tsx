@@ -1,3 +1,5 @@
+import { MonacoWrapper, detectLanguage } from './monaco-wrapper';
+
 interface EditorPanelProps {
   filePath: string | null;
   content: string;
@@ -16,6 +18,7 @@ export function EditorPanel({ filePath, content, onContentChange, onSave, isDirt
   }
 
   const fileName = filePath.split('/').pop() ?? filePath;
+  const language = detectLanguage(filePath);
 
   return (
     <div className="flex flex-col h-full">
@@ -33,16 +36,13 @@ export function EditorPanel({ filePath, content, onContentChange, onSave, isDirt
           保存
         </button>
       </div>
-      <div className="flex-1" id="monaco-editor-container">
-        {/* Monaco Editor will be mounted here in Task 8 */}
-        <textarea
-          className="w-full h-full p-4 bg-background text-foreground font-mono text-sm resize-none border-0 outline-none"
-          value={content}
-          onChange={(e) => onContentChange(e.target.value)}
-        />
+      <div className="flex-1">
+        <MonacoWrapper value={content} language={language} onChange={onContentChange} />
       </div>
-      <div className="border-t px-4 py-1 text-xs text-muted-foreground">
-        {isDirty ? '未保存' : '已保存'} | UTF-8
+      <div className="border-t px-4 py-1 text-xs text-muted-foreground flex gap-4">
+        <span>{isDirty ? '未保存' : '已保存'}</span>
+        <span>UTF-8</span>
+        <span>{language}</span>
       </div>
     </div>
   );
