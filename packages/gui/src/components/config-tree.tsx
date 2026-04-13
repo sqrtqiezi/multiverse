@@ -1,0 +1,111 @@
+import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react';
+import { useState } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import type { ConfigFile, ConfigGroup } from '@/types';
+
+interface ConfigTreeProps {
+  groups: ConfigGroup[];
+  selectedFile: string | null;
+  onCreateFile: (basePath: string, filePath: string) => void;
+  onFileSelect: (basePath: string, file: ConfigFile) => void;
+}
+
+function TreeGroup({
+  group,
+  selectedFile,
+  onCreateFile,
+  onFileSelect,
+}: {
+  group: ConfigGroup;
+  selectedFile: string | null;
+  onCreateFile: (basePath: string, filePath: string) => void;
+  onFileSelect: (basePath: string, file: ConfigFile) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div className="mb-2" data-testid={`config-group-${group.label}`}>
+      <button
+        type="button"
+        className="flex w-full min-w-0 items-center gap-1 rounded px-2 py-1 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 shrink-0" />
+        ) : (
+          <ChevronRight className="h-4 w-4 shrink-0" />
+        )}
+        <Folder className="h-4 w-4 shrink-0" />
+        <span className="truncate" title={group.label}>
+          {group.label}
+        </span>
+      </button>
+      {expanded && (
+        <div className="ml-4">
+          {group.files.map((file) => {
+            const fileKey = `${group.basePath}:${file.path}`;
+            const isSelected = selectedFile === fileKey;
+            return (
+              <button
+                type="button"
+                key={fileKey}
+                data-testid={`config-file-${file.path.split('/').pop()}`}
+                className={`flex w-full min-w-0 items-center gap-1 rounded px-2 py-1 text-left text-sm ${
+                  isSelected
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                }`}
+                onClick={() => onFileSelect(group.basePath, file)}
+              >
+                <File className="h-3 w-3 shrink-0" />
+                <span className="truncate" title={file.path}>
+                  {file.path}
+                </span>
+              </button>
+            );
+          })}
+          {group.files.length === 0 && (
+            <div className="space-y-1 px-2 py-1">
+              <p className="text-xs text-muted-foreground">无配置文件</p>
+              <button
+                type="button"
+                data-testid="config-create-CLAUDE.md"
+                className="text-xs text-sidebar-foreground underline underline-offset-4 hover:text-sidebar-accent-foreground"
+                onClick={() => onCreateFile(group.basePath, 'CLAUDE.md')}
+              >
+                创建 CLAUDE.md
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ConfigTree({ groups, selectedFile, onCreateFile, onFileSelect }: ConfigTreeProps) {
+  return (
+    <ScrollArea className="h-full w-full" data-testid="config-sidebar">
+      <div className="min-w-0 p-2">
+        <h2 className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          配置
+        </h2>
+        {groups.length === 0 && (
+          <div className="px-2 py-1 text-xs text-muted-foreground">
+            <p>未找到模板</p>
+            <p>运行 multiverse template create default</p>
+          </div>
+        )}
+        {groups.map((group) => (
+          <TreeGroup
+            key={group.label}
+            group={group}
+            selectedFile={selectedFile}
+            onCreateFile={onCreateFile}
+            onFileSelect={onFileSelect}
+          />
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}

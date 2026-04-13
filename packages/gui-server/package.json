@@ -1,0 +1,29 @@
+{
+  "name": "@multiverse/gui-server",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "multiverse-gui-server": "./dist/index.js"
+  },
+  "dependencies": {
+    "@multiverse/core": "workspace:*",
+    "@multiverse/types": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "devDependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  }
+}

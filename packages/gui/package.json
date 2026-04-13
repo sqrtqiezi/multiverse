@@ -4,14 +4,27 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@multiverse/core": "workspace:*",
     "@multiverse/types": "workspace:*",
+    "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/api": "^2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.8.0",
+    "monaco-editor": "^0.55.1",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "react-resizable-panels": "^4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@types/node": "^22.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
@@ -20,9 +33,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "MULTIVERSE_GUI_PROJECT_PATH=\"$(pwd)/../..\" VITE_MULTIVERSE_GUI_PROJECT_PATH=\"$(pwd)/../..\" MULTIVERSE_GUI_SERVER_PATH=\"$(pwd)/../gui-server/dist/index.js\" tauri dev",
     "tauri:build": "tauri build",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:e2e": "cd ../../e2e && pnpm tsx run-gui-e2e.ts"
   }
 }
