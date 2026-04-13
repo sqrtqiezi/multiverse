@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -11,8 +12,34 @@ struct Sidecar {
 }
 
 struct AppState {
+    sidecar_child: Mutex<Option<Child>>,
     sidecar: Mutex<Option<Sidecar>>,
     next_id: Mutex<u64>,
+}
+
+fn default_gui_server_path() -> String {
+    let Some(exe_dir) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+    else {
+        return "packages/gui-server/dist/index.js".to_string();
+    };
+
+    let candidates: [PathBuf; 2] = [
+        exe_dir.join("../../../../gui-server/dist/index.js"),
+        exe_dir.join("../../packages/gui-server/dist/index.js"),
+    ];
+
+    for candidate in candidates {
+        if candidate.exists() {
+            return candidate.to_string_lossy().to_string();
+        }
+    }
+
+    exe_dir
+        .join("../../../../gui-server/dist/index.js")
+        .to_string_lossy()
+        .to_string()
 }
 
 async fn start_sidecar(gui_server_path: &str) -> Result<(Child, Sidecar), String> {
@@ -56,9 +83,7 @@ async fn rpc_call(
     params: Value,
 ) -> Result<Value, String> {
     let mut sidecar_guard = state.sidecar.lock().await;
-    let sidecar = sidecar_guard
-        .as_mut()
-        .ok_or("Sidecar not started")?;
+    let sidecar = sidecar_guard.as_mut().ok_or("Sidecar not started")?;
 
     let mut id_guard = state.next_id.lock().await;
     let id = *id_guard;
@@ -91,9 +116,7 @@ async fn rpc_call(
         .await
         .map_err(|e| format!("Failed to flush sidecar stdin: {}", e))?;
 
-    let response = rx
-        .await
-        .map_err(|_| "Sidecar response channel closed")?;
+    let response = rx.await.map_err(|_| "Sidecar response channel closed")?;
 
     if let Some(error) = response.get("error") {
         return Err(format!("RPC error: {}", error));
@@ -107,20 +130,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let gui_server_path = std::env::var("MULTIVERSE_GUI_SERVER_PATH")
-                .unwrap_or_else(|_| {
-                    let exe_dir = std::env::current_exe()
-                        .ok()
-                        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-                    if let Some(dir) = exe_dir {
-                        dir.join("../../packages/gui-server/dist/index.js")
-                            .to_string_lossy()
-                            .to_string()
-                    } else {
-                        "packages/gui-server/dist/index.js".to_string()
-                    }
-                });
+                .unwrap_or_else(|_| default_gui_server_path());
 
             let state = AppState {
+                sidecar_child: Mutex::new(None),
                 sidecar: Mutex::new(None),
                 next_id: Mutex::new(1),
             };
@@ -131,7 +144,8 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let state = app_handle.state::<AppState>();
                 match start_sidecar(&gui_server_path).await {
-                    Ok((_child, sidecar)) => {
+                    Ok((child, sidecar)) => {
+                        *state.sidecar_child.lock().await = Some(child);
                         *state.sidecar.lock().await = Some(sidecar);
                         eprintln!("gui-server sidecar started");
                     }

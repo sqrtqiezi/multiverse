@@ -17,20 +17,25 @@ export { detectLanguage };
 
 export function MonacoWrapper({ value, language, onChange }: MonacoWrapperProps) {
   return (
-    <Editor
-      height="100%"
-      language={language}
-      value={value}
-      onChange={(val) => onChange(val ?? '')}
-      theme="vs-dark"
-      options={{
-        minimap: { enabled: true },
-        fontSize: 14,
-        lineNumbers: 'on',
-        wordWrap: 'on',
-        automaticLayout: true,
-        scrollBeyondLastLine: false,
-      }}
-    />
+    <div className="relative h-full min-h-0 min-w-0 w-full overflow-hidden">
+      <Editor
+        height="100%"
+        width="100%"
+        language={language}
+        value={value}
+        onChange={(val) => onChange(val ?? '')}
+        theme="vs-dark"
+        options={{
+          minimap: { enabled: false },
+          fontSize: 14,
+          lineNumbers: 'on',
+          wordWrap: 'on',
+          automaticLayout: true,
+          scrollBeyondLastLine: false,
+          overviewRulerLanes: 0,
+          padding: { top: 12, bottom: 12 },
+        }}
+      />
+    </div>
   );
 }

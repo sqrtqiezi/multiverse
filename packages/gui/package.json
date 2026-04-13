@@ -33,10 +33,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "MULTIVERSE_GUI_PROJECT_PATH=\"$(pwd)/../..\" VITE_MULTIVERSE_GUI_PROJECT_PATH=\"$(pwd)/../..\" MULTIVERSE_GUI_SERVER_PATH=\"$(pwd)/../gui-server/dist/index.js\" tauri dev",
     "tauri:build": "tauri build",
     "clean": "rm -rf dist",
-    "test:e2e": "cd ../../e2e && pnpm wdio run wdio.conf.ts"
+    "test:e2e": "cd ../../e2e && pnpm tsx run-gui-e2e.ts"
   }
 }

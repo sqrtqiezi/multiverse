@@ -5,6 +5,10 @@
   "bin": {
     "multiverse-gui-server": "./dist/index.js"
   },
+  "dependencies": {
+    "@multiverse/core": "workspace:*",
+    "@multiverse/types": "workspace:*"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

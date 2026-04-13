@@ -8,6 +8,7 @@ interface AppLayoutProps {
   selectedFile: string | null;
   fileContent: string;
   isDirty: boolean;
+  onCreateFile: (basePath: string, filePath: string) => void;
   onFileSelect: (basePath: string, file: ConfigFile) => void;
   onContentChange: (content: string) => void;
   onSave: () => void;
@@ -18,20 +19,31 @@ export function AppLayout({
   selectedFile,
   fileContent,
   isDirty,
+  onCreateFile,
   onFileSelect,
   onContentChange,
   onSave,
 }: AppLayoutProps) {
   return (
-    <div className="h-screen w-screen dark">
-      <ResizablePanelGroup direction="horizontal">
-        <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+    <div className="dark h-screen w-screen overflow-hidden bg-background text-foreground">
+      <ResizablePanelGroup direction="horizontal" className="overflow-hidden">
+        <ResizablePanel
+          defaultSize="25%"
+          minSize="15%"
+          maxSize="40%"
+          className="min-h-0 min-w-64 overflow-hidden"
+        >
           <div className="h-full bg-sidebar-background border-r">
-            <ConfigTree groups={groups} selectedFile={selectedFile} onFileSelect={onFileSelect} />
+            <ConfigTree
+              groups={groups}
+              selectedFile={selectedFile}
+              onCreateFile={onCreateFile}
+              onFileSelect={onFileSelect}
+            />
           </div>
         </ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel defaultSize={75}>
+        <ResizablePanel defaultSize="75%" className="min-h-0 min-w-0 overflow-hidden">
           <EditorPanel
             filePath={selectedFile}
             content={fileContent}
